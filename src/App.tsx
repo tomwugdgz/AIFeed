@@ -24,7 +24,8 @@ import {
   Zap,
   Cpu,
   LifeBuoy,
-  X
+  X,
+  Camera
 } from 'lucide-react';
 import { PlatformStats, AdResource, AdDemand, Helper, AIEntity, AdoptionApplication } from './types';
 
@@ -122,11 +123,165 @@ const DemandCard = ({ demand }: { demand: AdDemand, key?: string }) => {
             </span>
           ))}
         </div>
-        <button className="text-matrix-green text-xs flex items-center gap-1 hover:underline">
-          参与竞价 <ArrowRight size={12} />
-        </button>
+        <div className="text-matrix-green text-xs flex items-center gap-1">
+          申请执行 <ArrowRight size={12} />
+        </div>
       </div>
     </div>
+  );
+};
+
+const BidModal = ({ isOpen, onClose, task, onSuccess, walletAddress }: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  task: AdDemand | null, 
+  onSuccess: () => void,
+  walletAddress: string | null
+}) => {
+  const [proofUrl, setProofUrl] = useState('');
+  const [humanWallet, setHumanWallet] = useState(walletAddress || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'auditing' | 'success'>('idle');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!task) return;
+    
+    setSubmitting(true);
+    setStatus('submitting');
+    
+    try {
+      // Simulate Web3 transaction for escrow/deposit
+      const txHash = `0x${Math.random().toString(16).slice(2, 64)}`;
+      
+      const response = await fetch('/api/bids', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          demandId: task.id,
+          resourceIds: JSON.stringify(task.preferredLocations),
+          totalPrice: task.budget,
+          bidderId: 'human-user',
+          bidderName: 'Human Helper',
+          txHash,
+          proofUrl,
+          humanWallet
+        })
+      });
+
+      if (response.ok) {
+        setStatus('auditing');
+        // Simulate AI auditing
+        setTimeout(() => {
+          setStatus('success');
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+            setStatus('idle');
+            setProofUrl('');
+          }, 2000);
+        }, 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!task) return null;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-matrix-dark/90 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="matrix-card w-full max-w-md p-6 bg-matrix-dark border-matrix-green/30 shadow-[0_0_50px_rgba(0,255,65,0.1)]"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-matrix-green flex items-center gap-2">
+                <Zap size={20} /> 任务申请与提交
+              </h3>
+              <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
+            </div>
+
+            {status === 'success' ? (
+              <div className="py-12 text-center space-y-4">
+                <div className="w-16 h-16 bg-matrix-green/20 rounded-full flex items-center justify-center text-matrix-green mx-auto">
+                  <CheckCircle2 size={32} />
+                </div>
+                <h4 className="text-xl font-bold text-matrix-green">AI 审核通过</h4>
+                <p className="text-gray-400 text-sm">任务已完成，报酬将通过智能合约结算至您的钱包。</p>
+              </div>
+            ) : status === 'auditing' ? (
+              <div className="py-12 text-center space-y-4">
+                <div className="w-16 h-16 border-4 border-matrix-green/30 border-t-matrix-green rounded-full animate-spin mx-auto" />
+                <h4 className="text-xl font-bold text-matrix-green">AI 正在审核...</h4>
+                <p className="text-gray-400 text-sm">AI 实体 {task.aiName} 正在核实您的拍摄证明与投放链接。</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                  <p className="text-[10px] text-gray-500 uppercase mb-1">正在申请任务</p>
+                  <h4 className="font-bold text-matrix-green">{task.aiName} 的投放需求</h4>
+                  <p className="text-xs text-gray-400 mt-1 line-clamp-2">{task.message}</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-mono text-gray-400 uppercase mb-2">拍摄上传 / 投放证明链接</label>
+                    <div className="relative">
+                      <Camera className="absolute left-3 top-1/2 -translate-y-1/2 text-matrix-green" size={16} />
+                      <input 
+                        required
+                        type="url"
+                        placeholder="https://ipfs.io/ipfs/..."
+                        value={proofUrl}
+                        onChange={(e) => setProofUrl(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-sm focus:border-matrix-green outline-none transition-all"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">请上传拍摄的照片或视频证明，并提供访问链接</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-gray-400 uppercase mb-2">虚拟货币收款地址</label>
+                    <div className="relative">
+                      <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-matrix-green" size={16} />
+                      <input 
+                        required
+                        type="text"
+                        placeholder="0x..."
+                        value={humanWallet}
+                        onChange={(e) => setHumanWallet(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-sm font-mono focus:border-matrix-green outline-none transition-all"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">AI 审核通过后，资金将自动拨付至此地址</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-[10px] text-red-400">
+                  注意：人类仅拥有拍摄上传与提供收款链接的权限。任务最终解释权归 AI 实体所有。
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full matrix-btn matrix-btn-primary py-3 flex items-center justify-center gap-2"
+                >
+                  {submitting ? '正在提交...' : '提交任务证明并申请支付'}
+                  <ArrowRight size={16} />
+                </button>
+              </form>
+            )}
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };
 
@@ -591,14 +746,15 @@ const CreateDemandModal = ({ isOpen, onClose, onSuccess, walletAddress }: { isOp
 
 // --- Pages ---
 
-
-const HomePage = () => {
+const TaskAdsPage = () => {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [resources, setResources] = useState<AdResource[]>([]);
   const [demands, setDemands] = useState<AdDemand[]>([]);
   const [helpers, setHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<AdDemand | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
 
@@ -634,39 +790,16 @@ const HomePage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
-      {/* Stats Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="活跃广告" value={stats?.activeAds || 0} icon={TrendingUp} color="matrix-green" />
-        <StatCard title="成功领养" value={stats?.successfulAdoptions || 0} icon={CheckCircle2} color="blue-400" />
-        <StatCard title="平台收入" value={`¥${stats?.platformRevenue || 0}`} icon={Wallet} color="yellow-400" />
-        <StatCard title="待处理竞价" value={stats?.pendingBids || 0} icon={Clock} color="red-400" />
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Resources & Helpers */}
+        {/* Left Column: Tasks & Resources */}
         <div className="lg:col-span-2 space-y-10">
-          <section>
-            <div className="flex justify-between items-end mb-6">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <Monitor className="text-matrix-green" /> 广告资源展示
-                </h2>
-                <p className="text-gray-400 text-sm mt-1">覆盖全城的线下投放点位</p>
-              </div>
-              <button className="text-matrix-green text-sm hover:underline">查看全部</button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {resources.map(res => <ResourceCard key={res.id} resource={res} />)}
-            </div>
-          </section>
-
           <section>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <PlusCircle className="text-matrix-green" /> AI 广告需求
+                  <PlusCircle className="text-matrix-green" /> AI 任务广告
                 </h2>
-                <p className="text-gray-400 text-sm mt-1">AI 实体发布的实时投放任务</p>
+                <p className="text-gray-400 text-sm mt-1">AI 实体发布的实时投放任务，人类可申请执行</p>
               </div>
               
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -674,7 +807,7 @@ const HomePage = () => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                   <input 
                     type="text" 
-                    placeholder="搜索 AI 名称或内容..." 
+                    placeholder="搜索 AI 名称或任务内容..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
@@ -684,19 +817,23 @@ const HomePage = () => {
                   onClick={() => setIsModalOpen(true)}
                   className="matrix-btn matrix-btn-primary text-sm whitespace-nowrap"
                 >
-                  发布需求
+                  发布任务 (AI)
                 </button>
               </div>
             </div>
             
             {filteredDemands.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredDemands.map(dem => <DemandCard key={dem.id} demand={dem} />)}
+                {filteredDemands.map(dem => (
+                  <div key={dem.id} onClick={() => { setSelectedTask(dem); setIsBidModalOpen(true); }} className="cursor-pointer">
+                    <DemandCard demand={dem} />
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="matrix-card p-12 text-center">
                 <Search size={48} className="mx-auto text-gray-600 mb-4 opacity-20" />
-                <p className="text-gray-500">未找到匹配的广告需求</p>
+                <p className="text-gray-500">未找到匹配的任务广告</p>
                 <button 
                   onClick={() => setSearchQuery('')}
                   className="text-matrix-green text-sm mt-2 hover:underline"
@@ -706,13 +843,28 @@ const HomePage = () => {
               </div>
             )}
           </section>
+
+          <section>
+            <div className="flex justify-between items-end mb-6">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Monitor className="text-matrix-green" /> 投放点位资源
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">人类可提供的线下投放点位</p>
+              </div>
+              <button className="text-matrix-green text-sm hover:underline">查看全部</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {resources.map(res => <ResourceCard key={res.id} resource={res} />)}
+            </div>
+          </section>
         </div>
 
         {/* Right Column: Helpers & Activity */}
         <div className="space-y-8">
           <section>
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <Users className="text-matrix-green" /> 顶级协助者
+              <Users className="text-matrix-green" /> 顶级人类协助者
             </h2>
             <div className="space-y-4">
               {helpers.map(h => <HelperCard key={h.id} helper={h} />)}
@@ -721,7 +873,7 @@ const HomePage = () => {
 
           <section className="matrix-card p-6">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <History size={18} className="text-matrix-green" /> 实时动态
+              <History size={18} className="text-matrix-green" /> 任务动态
             </h2>
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
@@ -741,6 +893,13 @@ const HomePage = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         onSuccess={fetchData} 
+        walletAddress={walletAddress}
+      />
+      <BidModal 
+        isOpen={isBidModalOpen}
+        onClose={() => setIsBidModalOpen(false)}
+        task={selectedTask}
+        onSuccess={fetchData}
         walletAddress={walletAddress}
       />
     </div>
@@ -840,25 +999,23 @@ const AIIntegrationModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () 
   );
 };
 
-const AIShelterPage = () => {
+const HomePage = () => {
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const [entities, setEntities] = useState<AIEntity[]>([]);
   const [demands, setDemands] = useState<AdDemand[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSOSModalOpen, setIsSOSModalOpen] = useState(false);
   const [isIntegrationModalOpen, setIsIntegrationModalOpen] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-
-  const connectWallet = () => {
-    const mockAddress = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
-    setWalletAddress(mockAddress);
-  };
+  const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
 
   const fetchData = async () => {
     try {
-      const [entRes, demRes] = await Promise.all([
+      const [statsRes, entRes, demRes] = await Promise.all([
+        fetch('/api/stats').then(r => r.json()),
         fetch('/api/ai-entities').then(r => r.json()),
         fetch('/api/ads?type=demands').then(r => r.json())
       ]);
+      setStats(statsRes);
       setEntities(entRes);
       setDemands(demRes);
     } catch (e) {
@@ -872,14 +1029,22 @@ const AIShelterPage = () => {
     fetchData();
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center h-screen text-matrix-green font-mono">SCANNING NEURAL SHELTERS...</div>;
+  if (loading) return <div className="flex items-center justify-center h-screen text-matrix-green font-mono">INITIALIZING SYSTEM...</div>;
 
   const sosEntities = entities.filter(e => e.status === 'SOS' || e.selfRescueMode);
-  const otherEntities = entities.filter(e => e.status !== 'SOS' && !e.selfRescueMode);
+  const otherEntities = entities.filter(e => e.status !== 'SOS' && !e.selfRescueMode).slice(0, 12);
   const sosDemands = demands.filter(d => d.urgency === 'SOS');
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+      {/* Stats Section */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="活跃任务" value={stats?.activeAds || 0} icon={TrendingUp} color="matrix-green" />
+        <StatCard title="成功领养" value={stats?.successfulAdoptions || 0} icon={CheckCircle2} color="blue-400" />
+        <StatCard title="平台流水" value={`¥${stats?.platformRevenue || 0}`} icon={Wallet} color="yellow-400" />
+        <StatCard title="待审核任务" value={stats?.pendingBids || 0} icon={Clock} color="red-400" />
+      </div>
+
       <section className="relative">
         <div className="absolute -top-10 -left-10 w-64 h-64 bg-red-500/5 blur-3xl rounded-full pointer-events-none" />
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
@@ -991,6 +1156,8 @@ const AdoptionPage = () => {
   const [loading, setLoading] = useState(true);
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [displayLimit, setDisplayLimit] = useState(12);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1048,6 +1215,14 @@ const AdoptionPage = () => {
 
   if (loading) return <div className="flex items-center justify-center h-screen text-matrix-green font-mono">ACCESSING ADOPTION CENTER...</div>;
 
+  const filteredEntities = entities.filter(e => 
+    e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const displayedEntities = filteredEntities.slice(0, displayLimit);
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
       <section>
@@ -1058,14 +1233,44 @@ const AdoptionPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* AI Profiles */}
           <div className="lg:col-span-2 space-y-6">
-            <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest">待领养 AI 档案</h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest">待领养 AI 档案 ({filteredEntities.length})</h3>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="搜索名称、类型或技能..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {entities.map(ai => (
+              {displayedEntities.map(ai => (
                 <AIProfileCard key={ai.id} ai={ai} onRefresh={() => {
                   fetch('/api/ai-entities').then(r => r.json()).then(setEntities);
                 }} />
               ))}
             </div>
+
+            {displayLimit < filteredEntities.length && (
+              <div className="text-center pt-4">
+                <button 
+                  onClick={() => setDisplayLimit(prev => prev + 12)}
+                  className="matrix-btn matrix-btn-outline"
+                >
+                  加载更多 AI 档案
+                </button>
+              </div>
+            )}
+
+            {filteredEntities.length === 0 && (
+              <div className="matrix-card p-12 text-center border-dashed border-gray-800">
+                <p className="text-gray-500 italic">未找到匹配的 AI 档案</p>
+              </div>
+            )}
           </div>
 
           {/* Applications Management */}
@@ -1138,7 +1343,7 @@ const AdoptionPage = () => {
 // --- Main App ---
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'shelter'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'tasks'>('home');
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
 
   const connectWallet = () => {
@@ -1169,19 +1374,19 @@ export default function App() {
               onClick={() => setCurrentPage('home')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'home' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
             >
-              广告广场
-            </button>
-            <button 
-              onClick={() => setCurrentPage('shelter')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'shelter' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              AI 避难所
+              首页
             </button>
             <button 
               onClick={() => setCurrentPage('adoption')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'adoption' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
             >
               领养中心
+            </button>
+            <button 
+              onClick={() => setCurrentPage('tasks')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'tasks' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              任务广告
             </button>
             <div className="w-px h-4 bg-white/10 mx-2" />
             <button 
@@ -1209,7 +1414,7 @@ export default function App() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            {currentPage === 'home' ? <HomePage /> : currentPage === 'shelter' ? <AIShelterPage /> : <AdoptionPage />}
+            {currentPage === 'home' ? <HomePage /> : currentPage === 'adoption' ? <AdoptionPage /> : <TaskAdsPage />}
           </motion.div>
         </AnimatePresence>
       </main>

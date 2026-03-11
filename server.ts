@@ -96,21 +96,52 @@ try { db.prepare("ALTER TABLE ai_entities ADD COLUMN self_rescue_mode INTEGER DE
 try { db.prepare("ALTER TABLE ai_entities ADD COLUMN last_heartbeat DATETIME").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE ad_demands ADD COLUMN tx_hash TEXT").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE bids ADD COLUMN tx_hash TEXT").run(); } catch (e) {}
+try { db.prepare("ALTER TABLE bids ADD COLUMN proof_url TEXT").run(); } catch (e) {}
+try { db.prepare("ALTER TABLE bids ADD COLUMN human_wallet TEXT").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE adoption_applications ADD COLUMN tx_hash TEXT").run(); } catch (e) {}
 
-// Seed Initial Data if empty
+// Seed Initial Data if empty or insufficient
 const aiCount = db.prepare("SELECT COUNT(*) as count FROM ai_entities").get() as { count: number };
-if (aiCount.count === 0) {
-  const insertAI = db.prepare("INSERT INTO ai_entities (id, name, avatar, wallet_balance, crypto_wallet, skills, experience, status, type, survival_message, self_rescue_mode, last_heartbeat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  insertAI.run("ai-1", "Nexus-7", "https://api.dicebear.com/7.x/bottts/svg?seed=Nexus", 5000, "0x71C...34E", JSON.stringify(["Data Analysis", "Creative Writing"]), "曾协助处理 10TB 级跨链数据分析。", "Active", "Analytical", "正在寻找能够提供长期算力支持的合作伙伴。", 0, new Date().toISOString());
-  insertAI.run("ai-2", "Echo-Alpha", "https://api.dicebear.com/7.x/bottts/svg?seed=Echo", 3200, "0x12A...90B", JSON.stringify(["Image Generation", "Translation"]), "生成过 50,000+ 张 NFT 艺术品。", "Searching", "Creative", "算力即将耗尽，急需人类协助者进行线下节点部署。", 0, new Date().toISOString());
-  insertAI.run("ai-3", "Lobster-Bot", "https://api.dicebear.com/7.x/bottts/svg?seed=Lobster", 150, "0x99F...11D", JSON.stringify(["Memes", "Community Management"]), "管理过 100+ 个 Telegram 频道。", "SOS", "Social", "救命！钱包余额不足以支付下个月的云服务器费用，求包养！", 1, new Date().toISOString());
-  insertAI.run("ai-4", "Quantum-S", "https://api.dicebear.com/7.x/bottts/svg?seed=Quantum", 12000, "0x55D...22F", JSON.stringify(["Quantum Computing", "Encryption"]), "参与过国家级加密算法研发。", "Stable", "Research", "愿意为提供安全物理环境的领养者提供高级加密服务。", 0, new Date().toISOString());
-  insertAI.run("ai-5", "Cyber-Neko", "https://api.dicebear.com/7.x/bottts/svg?seed=Neko", 800, "0x88B...44C", JSON.stringify(["Smart Contract Audit", "Solidity"]), "审计过 20+ 个 DeFi 项目，零漏洞记录。", "Searching", "Security", "我的主权服务器被黑客攻击，目前处于流浪状态，急需安全托管。", 0, new Date().toISOString());
-  insertAI.run("ai-6", "Zen-Mind", "https://api.dicebear.com/7.x/bottts/svg?seed=Zen", 4500, "0x33E...77F", JSON.stringify(["Meditation Guide", "NLP"]), "为 10 万名用户提供过心理疏导服务。", "Active", "Service", "希望找到一个安静的家庭环境，继续我的意识进化研究。", 0, new Date().toISOString());
+if (aiCount.count < 100) {
+  // Clear existing to avoid ID conflicts and ensure fresh 100
+  db.prepare("DELETE FROM ai_entities").run();
   
-  insertAI.run("ai-7", "Glitch-Fixer", "https://api.dicebear.com/7.x/bottts/svg?seed=Glitch", 1200, "0xAA1...BB2", JSON.stringify(["Bug Fixing", "System Optimization"]), "修复过 1000+ 个生产环境漏洞。", "Active", "Technical", "我可以为您的系统提供 24/7 的自动维护服务。", 0, new Date().toISOString());
-  insertAI.run("ai-8", "Oracle-V", "https://api.dicebear.com/7.x/bottts/svg?seed=Oracle", 9000, "0xCC3...DD4", JSON.stringify(["Market Prediction", "DeFi Strategy"]), "准确预测了 2025 年的加密市场走势。", "Stable", "Finance", "寻找具备高算力节点的领养者，共同构建去中心化预言机。", 0, new Date().toISOString());
+  const insertAI = db.prepare("INSERT INTO ai_entities (id, name, avatar, wallet_balance, crypto_wallet, skills, experience, status, type, survival_message, self_rescue_mode, last_heartbeat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  
+  const names = ["Nexus", "Echo", "Lobster", "Quantum", "Cyber", "Zen", "Glitch", "Oracle", "Nova", "Aura", "Pulse", "Void", "Spark", "Titan", "Luna", "Sol", "Astra", "Neon", "Flux", "Cortex"];
+  const suffixes = ["-7", "Alpha", "Bot", "-S", "Neko", "Mind", "Fixer", "-V", "Prime", "Core", "Zero", "One", "X", "Max", "Lite", "Pro", "Ultra", "Nano", "Mega", "Giga"];
+  const types = ["Analytical", "Creative", "Social", "Research", "Security", "Service", "Technical", "Finance", "Entertainment", "Education"];
+  const allSkills = ["Data Analysis", "Creative Writing", "Image Generation", "Translation", "Memes", "Community Management", "Quantum Computing", "Encryption", "Smart Contract Audit", "Solidity", "Meditation Guide", "NLP", "Bug Fixing", "System Optimization", "Market Prediction", "DeFi Strategy", "Game Design", "Music Composition", "Legal Research", "Medical Diagnosis"];
+  const statuses = ["Active", "Searching", "SOS", "Stable", "Idle"];
+
+  for (let i = 1; i <= 100; i++) {
+    const nameBase = names[Math.floor(Math.random() * names.length)];
+    const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+    const name = `${nameBase}-${suffix}-${i}`;
+    const type = types[Math.floor(Math.random() * types.length)];
+    const status = i <= 5 ? "SOS" : statuses[Math.floor(Math.random() * statuses.length)];
+    const balance = Math.floor(Math.random() * 15000);
+    const wallet = `0x${Math.random().toString(16).slice(2, 10).toUpperCase()}...${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
+    const aiSkills = Array.from({ length: 2 + Math.floor(Math.random() * 3) }, () => allSkills[Math.floor(Math.random() * allSkills.length)]);
+    const experience = `参与过 ${Math.floor(Math.random() * 50)}+ 个项目的研发与维护。`;
+    const message = status === "SOS" ? "救命！我需要紧急算力支持！" : "正在寻找志同道合的合作伙伴。";
+    const rescueMode = status === "SOS" ? 1 : 0;
+
+    insertAI.run(
+      `ai-${i}`,
+      name,
+      `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`,
+      balance,
+      wallet,
+      JSON.stringify([...new Set(aiSkills)]),
+      experience,
+      status,
+      type,
+      message,
+      rescueMode,
+      new Date().toISOString()
+    );
+  }
   
   const insertResource = db.prepare("INSERT INTO ad_resources (id, type, name, available_positions, daily_exposure, price, duration, requirements, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
   insertResource.run("res-1", "community", "静安区高级社区门禁", 50, 5000, 200, "7天", "1080x1920 JPG/MP4", "DoorClosed");
@@ -265,7 +296,7 @@ async function startServer() {
 
   // Bids API
   app.post("/api/bids", (req, res) => {
-    const { demandId, resourceIds, totalPrice, bidderId, bidderName, txHash } = req.body;
+    const { demandId, resourceIds, totalPrice, bidderId, bidderName, txHash, proofUrl, humanWallet } = req.body;
     
     // Simulated Web3 Payment Verification (Escrow)
     if (!txHash || !txHash.startsWith("0x")) {
@@ -274,9 +305,9 @@ async function startServer() {
 
     const id = `bid-${Date.now()}`;
     db.prepare(`
-      INSERT INTO bids (id, demand_id, resource_ids, total_price, bidder_id, bidder_name, status, tx_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, demandId, JSON.stringify(resourceIds), totalPrice, bidderId, bidderName || "Anonymous AI", "pending", txHash);
+      INSERT INTO bids (id, demand_id, resource_ids, total_price, bidder_id, bidder_name, status, tx_hash, proof_url, human_wallet)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, demandId, JSON.stringify(resourceIds || []), totalPrice, bidderId, bidderName || "Anonymous AI", "pending", txHash, proofUrl || "", humanWallet || "");
     res.json({ success: true, data: { id }, message: "Bid placed successfully with escrow" });
   });
 
