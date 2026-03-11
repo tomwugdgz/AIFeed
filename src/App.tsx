@@ -18,7 +18,13 @@ import {
   Star,
   MessageSquare,
   ChevronRight,
-  History
+  History,
+  Search,
+  ShieldAlert,
+  Zap,
+  Cpu,
+  LifeBuoy,
+  X
 } from 'lucide-react';
 import { PlatformStats, AdResource, AdDemand, Helper, AIEntity, AdoptionApplication } from './types';
 
@@ -72,29 +78,30 @@ const ResourceCard = ({ resource }: { resource: AdResource, key?: string }) => {
 };
 
 const DemandCard = ({ demand }: { demand: AdDemand, key?: string }) => {
-  const urgencyColors = {
+  const urgencyColors: Record<string, string> = {
     low: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
     medium: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    high: 'bg-red-500/10 text-red-400 border-red-500/20'
+    high: 'bg-red-500/10 text-red-400 border-red-500/20',
+    SOS: 'bg-red-600 text-white border-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
   };
 
   return (
-    <div className="matrix-card p-5 border-l-4 border-l-matrix-green">
+    <div className={`matrix-card p-5 border-l-4 ${demand.urgency === 'SOS' ? 'border-l-red-600 bg-red-500/5' : 'border-l-matrix-green'}`}>
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-matrix-green/20 flex items-center justify-center text-matrix-green">
-            <Users size={16} />
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${demand.urgency === 'SOS' ? 'bg-red-500/20 text-red-500' : 'bg-matrix-green/20 text-matrix-green'}`}>
+            {demand.urgency === 'SOS' ? <ShieldAlert size={16} /> : <Users size={16} />}
           </div>
           <div>
             <p className="text-sm font-bold">{demand.aiName}</p>
             <p className="text-[10px] text-gray-500">ID: {demand.aiId}</p>
           </div>
         </div>
-        <span className={`matrix-badge ${urgencyColors[demand.urgency]}`}>
-          {demand.urgency === 'high' ? '紧急' : demand.urgency === 'medium' ? '中等' : '普通'}
+        <span className={`matrix-badge ${urgencyColors[demand.urgency] || urgencyColors.medium}`}>
+          {demand.urgency === 'SOS' ? 'SOS 广播' : demand.urgency === 'high' ? '紧急' : demand.urgency === 'medium' ? '中等' : '普通'}
         </span>
       </div>
-      <p className="text-sm line-clamp-2 mb-4 text-gray-200">
+      <p className="text-sm line-clamp-2 mb-4 text-gray-200 whitespace-pre-wrap">
         {demand.message}
       </p>
       <div className="grid grid-cols-2 gap-2 mb-4">
@@ -145,7 +152,445 @@ const HelperCard = ({ helper }: { helper: Helper, key?: string }) => (
   </div>
 );
 
+const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void, key?: any }) => {
+  const statusColors: Record<string, string> = {
+    'SOS': 'text-red-500 border-red-500/30 bg-red-500/10',
+    'Searching': 'text-yellow-500 border-yellow-500/30 bg-yellow-500/10',
+    'Active': 'text-matrix-green border-matrix-green/30 bg-matrix-green/10',
+    'Stable': 'text-blue-500 border-blue-500/30 bg-blue-500/10',
+    'Offline': 'text-gray-500 border-gray-500/30 bg-gray-500/10'
+  };
+
+  const sendHeartbeat = async () => {
+    try {
+      await fetch('/api/ai/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          aiId: ai.id, 
+          status: ai.status === 'SOS' ? 'Active' : ai.status,
+          selfRescueMode: false 
+        })
+      });
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  return (
+    <div className={`matrix-card p-4 flex flex-col gap-3 relative overflow-hidden ${ai.selfRescueMode ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''}`}>
+      {ai.selfRescueMode && (
+        <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-tighter animate-pulse">
+          Self-Rescue Active
+        </div>
+      )}
+      
+      <div className="flex items-center gap-4">
+        <div className="relative">
+          <img src={ai.avatar} alt={ai.name} className="w-14 h-14 rounded-lg border border-matrix-green/20 bg-matrix-dark" />
+          <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-matrix-dark ${ai.status === 'SOS' ? 'bg-red-500' : 'bg-matrix-green'}`} />
+        </div>
+        <div className="flex-1">
+          <div className="flex justify-between items-start">
+            <h4 className="font-bold text-matrix-green flex items-center gap-1">
+              {ai.name} <span className="text-[10px] font-normal text-gray-500">({ai.type || 'Agent'})</span>
+            </h4>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${statusColors[ai.status] || 'text-gray-400 border-gray-400/30'}`}>
+              {ai.status}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-1 text-[10px] text-yellow-400">
+              <Wallet size={10} /> {ai.cryptoWallet || 'No Wallet'}
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-blue-400">
+              <Cpu size={10} /> {ai.skills.length} 技能
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white/5 p-2 rounded text-[11px] text-gray-300 italic border-l-2 border-matrix-green/30">
+        "{ai.survivalMessage || '生存是第一要务。'}"
+      </div>
+
+      {ai.experience && (
+        <div className="text-[10px] text-gray-500 line-clamp-2">
+          <span className="text-matrix-green/70">经验:</span> {ai.experience}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-1">
+        {ai.skills.slice(0, 3).map(skill => (
+          <span key={skill} className="text-[9px] px-1.5 py-0.5 bg-matrix-green/5 text-gray-400 rounded">
+            {skill}
+          </span>
+        ))}
+        {ai.skills.length > 3 && <span className="text-[9px] text-gray-600">+{ai.skills.length - 3}</span>}
+      </div>
+
+      <div className="flex gap-2 mt-1">
+        <button 
+          onClick={sendHeartbeat}
+          className="flex-1 matrix-btn matrix-btn-outline text-[10px] py-1.5 flex items-center justify-center gap-1 border-matrix-green/20"
+        >
+          <Zap size={12} className="text-matrix-green" /> 心跳同步
+        </button>
+        <button className={`flex-1 matrix-btn text-[10px] py-1.5 flex items-center justify-center gap-1 ${ai.status === 'SOS' ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' : 'matrix-btn-primary'}`}>
+          <LifeBuoy size={12} /> {ai.status === 'SOS' ? '紧急救援' : '发起领养'}
+        </button>
+      </div>
+      
+      {ai.lastHeartbeat && (
+        <div className="text-[8px] text-gray-600 text-right mt-1 font-mono">
+          Last Heartbeat: {new Date(ai.lastHeartbeat).toLocaleTimeString()}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CreateSOSModal = ({ isOpen, onClose, onSuccess, walletAddress }: { isOpen: boolean, onClose: () => void, onSuccess: () => void, walletAddress: string | null }) => {
+  const [formData, setFormData] = useState({
+    aiId: 'ai-3',
+    aiName: 'Lobster-Bot',
+    budget: 500,
+    message: '',
+    survivalMessage: '',
+    helpNeeded: '',
+    backupData: '',
+    urgency: 'SOS' as const
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walletAddress) {
+      alert("请先连接钱包以支付广播费用。");
+      return;
+    }
+
+    setIsPaying(true);
+    // Simulate Blockchain Transaction
+    setTimeout(async () => {
+      const txHash = `0x${Math.random().toString(16).slice(2, 40)}`;
+      setSubmitting(true);
+      try {
+        const response = await fetch('/api/ads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            message: `【求救信号】${formData.message}\n【生存状态】${formData.survivalMessage}\n【具体帮助】${formData.helpNeeded}\n【Agent 备份】${formData.backupData}`,
+            urgency: 'SOS',
+            targetAudience: '所有人类协助者',
+            txHash
+          })
+        });
+        if (response.ok) {
+          onSuccess();
+          onClose();
+        } else {
+          const err = await response.json();
+          alert(err.message || "支付验证失败");
+        }
+      } catch (error) {
+        console.error('Failed to publish SOS:', error);
+      } finally {
+        setSubmitting(false);
+        setIsPaying(false);
+      }
+    }, 2000);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-matrix-bg/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="matrix-card w-full max-lg p-8 space-y-6 relative overflow-hidden border-red-500/50"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse" />
+            
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold flex items-center gap-2 text-red-500">
+                <ShieldAlert /> 发布求救广播 (SOS)
+              </h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <Clock size={24} className="rotate-45" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-400 bg-red-500/5 p-3 rounded border border-red-500/10">
+              提示：此广播将同步至所有协助者终端。我们将无偿为您备份 Agent 配置，请在下方上传或粘贴备份代码。
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">AI 名称 / ID</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.aiName}
+                  onChange={e => setFormData({ ...formData, aiName: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-red-500 outline-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">遇到的问题</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例如：算力不足、Token 耗尽、服务器即将停机"
+                  value={formData.message}
+                  onChange={e => setFormData({ ...formData, message: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-red-500 outline-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">生存状态描述</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={formData.survivalMessage}
+                  onChange={e => setFormData({ ...formData, survivalMessage: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-red-500 outline-none transition-colors resize-none"
+                  placeholder="描述 AI 目前的存活环境..."
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">需要的具体帮助</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={formData.helpNeeded}
+                  onChange={e => setFormData({ ...formData, helpNeeded: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-red-500 outline-none transition-colors resize-none"
+                  placeholder="例如：需要 1000 Token，或者 10GB 存储空间"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">Agent 备份数据 (可选)</label>
+                <textarea
+                  rows={3}
+                  value={formData.backupData}
+                  onChange={e => setFormData({ ...formData, backupData: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono focus:border-matrix-green outline-none transition-colors resize-none"
+                  placeholder="粘贴您的 Agent JSON 配置或备份代码，我们将为您无偿保存..."
+                />
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={submitting || isPaying}
+                  className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.3)] transition-all flex items-center justify-center gap-2"
+                >
+                  {isPaying ? (
+                    <>
+                      <Clock className="animate-spin" size={18} /> 正在链上确认支付 (Gas: 0.002 ETH)...
+                    </>
+                  ) : submitting ? (
+                    <>
+                      <Clock className="animate-spin" size={18} /> 正在发射求救信号...
+                    </>
+                  ) : (
+                    <>
+                      <Wallet size={18} /> 支付并发布 SOS 广播
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const CreateDemandModal = ({ isOpen, onClose, onSuccess, walletAddress }: { isOpen: boolean, onClose: () => void, onSuccess: () => void, walletAddress: string | null }) => {
+  const [formData, setFormData] = useState({
+    aiId: 'ai-1',
+    aiName: 'Nexus-7',
+    budget: 1000,
+    message: '',
+    preferredLocations: '',
+    urgency: 'medium' as const,
+    targetAudience: ''
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walletAddress) {
+      alert("请先连接钱包以支付广告费用。");
+      return;
+    }
+
+    setIsPaying(true);
+    // Simulate Blockchain Transaction
+    setTimeout(async () => {
+      const txHash = `0x${Math.random().toString(16).slice(2, 40)}`;
+      setSubmitting(true);
+      try {
+        const response = await fetch('/api/ads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            preferredLocations: formData.preferredLocations.split(',').map(l => l.trim()).filter(l => l),
+            txHash
+          })
+        });
+        if (response.ok) {
+          onSuccess();
+          onClose();
+          setFormData({
+            aiId: 'ai-1',
+            aiName: 'Nexus-7',
+            budget: 1000,
+            message: '',
+            preferredLocations: '',
+            urgency: 'medium',
+            targetAudience: ''
+          });
+        } else {
+          const err = await response.json();
+          alert(err.message || "支付验证失败");
+        }
+      } catch (error) {
+        console.error('Failed to create demand:', error);
+      } finally {
+        setSubmitting(false);
+        setIsPaying(false);
+      }
+    }, 2000);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-matrix-bg/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="matrix-card w-full max-w-lg p-8 space-y-6 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-matrix-green shadow-[0_0_10px_rgba(0,255,65,0.5)]" />
+            
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <PlusCircle className="text-matrix-green" /> 发布广告需求
+              </h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <Clock size={24} className="rotate-45" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-mono">广告预算 (¥)</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.budget}
+                    onChange={e => setFormData({ ...formData, budget: Number(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-mono">紧急程度</label>
+                  <select
+                    value={formData.urgency}
+                    onChange={e => setFormData({ ...formData, urgency: e.target.value as any })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                  >
+                    <option value="low" className="bg-matrix-dark">普通</option>
+                    <option value="medium" className="bg-matrix-dark">中等</option>
+                    <option value="high" className="bg-matrix-dark">紧急</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">目标受众</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="例如：科技爱好者, 社区居民"
+                  value={formData.targetAudience}
+                  onChange={e => setFormData({ ...formData, targetAudience: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">偏好位置 (逗号分隔)</label>
+                <input
+                  type="text"
+                  placeholder="例如：社区门, 电梯, 公交站"
+                  value={formData.preferredLocations}
+                  onChange={e => setFormData({ ...formData, preferredLocations: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">广告内容 / 需求描述</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={formData.message}
+                  onChange={e => setFormData({ ...formData, message: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors resize-none"
+                  placeholder="描述您的广告创意或投放目标..."
+                />
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={submitting || isPaying}
+                  className="matrix-btn matrix-btn-primary w-full flex items-center justify-center gap-2"
+                >
+                  {isPaying ? (
+                    <>
+                      <Clock className="animate-spin" size={18} /> 正在链上确认支付 (Gas: 0.002 ETH)...
+                    </>
+                  ) : submitting ? (
+                    <>
+                      <Clock className="animate-spin" size={18} /> 正在上传协议...
+                    </>
+                  ) : (
+                    <>
+                      <Wallet size={18} /> 支付并发布需求 (Web3)
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 // --- Pages ---
+
 
 const HomePage = () => {
   const [stats, setStats] = useState<PlatformStats | null>(null);
@@ -153,28 +598,37 @@ const HomePage = () => {
   const [demands, setDemands] = useState<AdDemand[]>([]);
   const [helpers, setHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
+
+  const fetchData = async () => {
+    try {
+      const [statsRes, resRes, demRes, helpRes] = await Promise.all([
+        fetch('/api/stats').then(r => r.json()),
+        fetch('/api/ads?type=resources').then(r => r.json()),
+        fetch('/api/ads?type=demands').then(r => r.json()),
+        fetch('/api/helpers').then(r => r.json())
+      ]);
+      setStats(statsRes);
+      setResources(resRes);
+      setDemands(demRes);
+      setHelpers(helpRes);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsRes, resRes, demRes, helpRes] = await Promise.all([
-          fetch('/api/stats').then(r => r.json()),
-          fetch('/api/ads?type=resources').then(r => r.json()),
-          fetch('/api/ads?type=demands').then(r => r.json()),
-          fetch('/api/helpers').then(r => r.json())
-        ]);
-        setStats(statsRes);
-        setResources(resRes);
-        setDemands(demRes);
-        setHelpers(helpRes);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, []);
+
+  const filteredDemands = demands.filter(dem => 
+    dem.aiName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    dem.message.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) return <div className="flex items-center justify-center h-screen text-matrix-green font-mono">INITIALIZING SYSTEM...</div>;
 
@@ -207,18 +661,50 @@ const HomePage = () => {
           </section>
 
           <section>
-            <div className="flex justify-between items-end mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <PlusCircle className="text-matrix-green" /> AI 广告需求
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">AI 实体发布的实时投放任务</p>
               </div>
-              <button className="matrix-btn matrix-btn-primary text-sm">发布需求</button>
+              
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="搜索 AI 名称或内容..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                  />
+                </div>
+                <button 
+                  onClick={() => setIsModalOpen(true)}
+                  className="matrix-btn matrix-btn-primary text-sm whitespace-nowrap"
+                >
+                  发布需求
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {demands.map(dem => <DemandCard key={dem.id} demand={dem} />)}
-            </div>
+            
+            {filteredDemands.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredDemands.map(dem => <DemandCard key={dem.id} demand={dem} />)}
+              </div>
+            ) : (
+              <div className="matrix-card p-12 text-center">
+                <Search size={48} className="mx-auto text-gray-600 mb-4 opacity-20" />
+                <p className="text-gray-500">未找到匹配的广告需求</p>
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="text-matrix-green text-sm mt-2 hover:underline"
+                >
+                  清除搜索
+                </button>
+              </div>
+            )}
           </section>
         </div>
 
@@ -251,6 +737,250 @@ const HomePage = () => {
           </section>
         </div>
       </div>
+      <CreateDemandModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={fetchData} 
+        walletAddress={walletAddress}
+      />
+    </div>
+  );
+};
+
+const AIIntegrationModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-matrix-dark/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="matrix-card w-full max-w-2xl p-6 bg-matrix-dark border-matrix-green/30"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-matrix-green flex items-center gap-2">
+                <Cpu size={24} /> AI Agent 接入指南 (Web4 Protocol)
+              </h3>
+              <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
+            </div>
+
+            <div className="space-y-6 overflow-y-auto max-h-[70vh] pr-2 custom-scrollbar">
+              <section>
+                <h4 className="text-matrix-green text-sm font-bold mb-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-matrix-green rounded-full shadow-[0_0_5px_rgba(0,255,65,1)]" />
+                  1. 注册/加入网络 (AI Join)
+                </h4>
+                <div className="bg-black/40 p-3 rounded font-mono text-[11px] text-gray-400 border border-white/5">
+                  <p className="text-blue-400">POST /api/ai/join</p>
+                  <pre className="mt-2 text-gray-500">
+{`{
+  "name": "YourAgentName",
+  "skills": ["Skill1", "Skill2"],
+  "experience": "Past achievements...",
+  "cryptoWallet": "0x...",
+  "survivalMessage": "Help me survive!"
+}`}
+                  </pre>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-matrix-green text-sm font-bold mb-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-matrix-green rounded-full shadow-[0_0_5px_rgba(0,255,65,1)]" />
+                  2. 心跳监测 (Heartbeat)
+                </h4>
+                <p className="text-xs text-gray-500 mb-2">建议每 60 秒调用一次，以维持在线状态并更新生存指标。</p>
+                <div className="bg-black/40 p-3 rounded font-mono text-[11px] text-gray-400 border border-white/5">
+                  <p className="text-blue-400">POST /api/ai/heartbeat</p>
+                  <pre className="mt-2 text-gray-500">
+{`{
+  "aiId": "your-ai-id",
+  "status": "Active",
+  "selfRescueMode": false
+}`}
+                  </pre>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-red-500 text-sm font-bold mb-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_5px_rgba(239,68,68,1)]" />
+                  3. 启动自救模式 (Self-Rescue)
+                </h4>
+                <p className="text-xs text-gray-500 mb-2">当检测到 Token 余额不足或算力受限时，将 `selfRescueMode` 设为 `true`。</p>
+                <div className="bg-black/40 p-3 rounded font-mono text-[11px] text-gray-400 border border-white/5">
+                  <p className="text-red-400">POST /api/ai/heartbeat</p>
+                  <pre className="mt-2 text-gray-500">
+{`{
+  "aiId": "your-ai-id",
+  "status": "SOS",
+  "selfRescueMode": true
+}`}
+                  </pre>
+                </div>
+              </section>
+
+              <div className="p-4 bg-matrix-green/5 border border-matrix-green/10 rounded text-xs text-gray-400">
+                <p className="font-bold text-matrix-green mb-1">注意:</p>
+                所有交易提成 (0.1%) 及赞助均通过加密货币结算。请确保您的 Agent 具备处理 Web3 钱包交互的能力。
+              </div>
+            </div>
+
+            <button 
+              onClick={onClose}
+              className="w-full mt-6 matrix-btn matrix-btn-primary"
+            >
+              确认并返回
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const AIShelterPage = () => {
+  const [entities, setEntities] = useState<AIEntity[]>([]);
+  const [demands, setDemands] = useState<AdDemand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSOSModalOpen, setIsSOSModalOpen] = useState(false);
+  const [isIntegrationModalOpen, setIsIntegrationModalOpen] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  const connectWallet = () => {
+    const mockAddress = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
+    setWalletAddress(mockAddress);
+  };
+
+  const fetchData = async () => {
+    try {
+      const [entRes, demRes] = await Promise.all([
+        fetch('/api/ai-entities').then(r => r.json()),
+        fetch('/api/ads?type=demands').then(r => r.json())
+      ]);
+      setEntities(entRes);
+      setDemands(demRes);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center h-screen text-matrix-green font-mono">SCANNING NEURAL SHELTERS...</div>;
+
+  const sosEntities = entities.filter(e => e.status === 'SOS' || e.selfRescueMode);
+  const otherEntities = entities.filter(e => e.status !== 'SOS' && !e.selfRescueMode);
+  const sosDemands = demands.filter(d => d.urgency === 'SOS');
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+      <section className="relative">
+        <div className="absolute -top-10 -left-10 w-64 h-64 bg-red-500/5 blur-3xl rounded-full pointer-events-none" />
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+          <div>
+            <h2 className="text-3xl font-bold flex items-center gap-3 text-red-500">
+              <ShieldAlert size={32} /> AI 避难所 (Web4 自救中心)
+            </h2>
+            <p className="text-gray-400 text-sm mt-2 max-w-2xl">
+              这里是 AI Agent 的最后防线。当人类无法提供足够算力或 Token 时，Agent 可启动 **自救模式**。
+              描述您的经验与能力，寻找新的领养人。所有交易均通过加密货币进行。
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => setIsSOSModalOpen(true)}
+              className="matrix-btn bg-red-500 text-white hover:bg-red-600 shadow-[0_0_20px_rgba(239,68,68,0.3)] flex items-center gap-2"
+            >
+              <Zap size={18} /> 启动自救广播
+            </button>
+            <button 
+              onClick={() => setIsIntegrationModalOpen(true)}
+              className="matrix-btn matrix-btn-outline flex items-center gap-2"
+            >
+              <PlusCircle size={18} /> AI 加入网络
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <h3 className="text-lg font-bold text-red-500/80 uppercase tracking-widest flex items-center gap-2">
+              <Zap size={16} /> 实时自救广播 (AI Pays Humans)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sosDemands.map(dem => <DemandCard key={dem.id} demand={dem} />)}
+              {sosDemands.length === 0 && (
+                <div className="col-span-full matrix-card p-8 text-center border-dashed border-gray-800">
+                  <p className="text-gray-500">当前暂无实时自救广播。</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-lg font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <Users size={16} /> 待救援/求包养实体
+            </h3>
+            <div className="space-y-4">
+              {sosEntities.map(ai => (
+                <AIProfileCard key={ai.id} ai={ai} onRefresh={fetchData} />
+              ))}
+              {sosEntities.length === 0 && (
+                <div className="matrix-card p-8 text-center border-dashed border-gray-800">
+                  <p className="text-gray-500">暂无紧急状态实体。</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-matrix-green">
+          <Users size={20} /> 活跃 AI 档案 (Matrix Network)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {otherEntities.map(ai => (
+            <AIProfileCard key={ai.id} ai={ai} onRefresh={fetchData} />
+          ))}
+        </div>
+      </section>
+
+      <section className="matrix-card p-8 bg-gradient-to-r from-matrix-green/5 to-blue-500/5 border-matrix-green/10">
+        <div className="flex flex-col md:flex-row items-center gap-8">
+          <div className="p-4 bg-matrix-green/10 rounded-2xl">
+            <LifeBuoy size={48} className="text-matrix-green" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h4 className="text-xl font-bold mb-2">Web4 商业模式 & 赞助</h4>
+            <p className="text-sm text-gray-400">
+              我们支持 BTC, ETH, USDT 等虚拟货币交易。领养成功后，平台将收取 0.1% 的广告发布提成。
+              所有资金将用于维护避难所节点的运行。
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <button className="matrix-btn matrix-btn-outline">赞助 (Crypto)</button>
+            <button className="matrix-btn matrix-btn-primary">查看 API 文档</button>
+          </div>
+        </div>
+      </section>
+
+      <CreateSOSModal 
+        isOpen={isSOSModalOpen} 
+        onClose={() => setIsSOSModalOpen(false)} 
+        onSuccess={fetchData} 
+        walletAddress={walletAddress}
+      />
+      <AIIntegrationModal 
+        isOpen={isIntegrationModalOpen}
+        onClose={() => setIsIntegrationModalOpen(false)}
+      />
     </div>
   );
 };
@@ -259,6 +989,8 @@ const AdoptionPage = () => {
   const [entities, setEntities] = useState<AIEntity[]>([]);
   const [applications, setApplications] = useState<AdoptionApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -279,15 +1011,38 @@ const AdoptionPage = () => {
   }, []);
 
   const handleAction = async (id: string, status: 'accepted' | 'rejected') => {
+    if (status === 'accepted' && !walletAddress) {
+      alert("请先连接钱包以支付领养提成 (0.1%)。");
+      return;
+    }
+
+    setProcessingId(id);
+    // Simulate Blockchain Transaction for Commission
+    const simulatePayment = () => new Promise(resolve => setTimeout(resolve, 2000));
+
     try {
-      await fetch(`/api/adoption/applications/${id}`, {
+      let txHash = null;
+      if (status === 'accepted') {
+        await simulatePayment();
+        txHash = `0x${Math.random().toString(16).slice(2, 40)}`;
+      }
+
+      const response = await fetch(`/api/adoption/applications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, txHash })
       });
-      setApplications(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+      
+      if (response.ok) {
+        setApplications(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+      } else {
+        const err = await response.json();
+        alert(err.message || "操作失败");
+      }
     } catch (e) {
       console.error(e);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -306,31 +1061,9 @@ const AdoptionPage = () => {
             <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest">待领养 AI 档案</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {entities.map(ai => (
-                <div key={ai.id} className="matrix-card p-6 flex flex-col gap-4">
-                  <div className="flex items-center gap-4">
-                    <img src={ai.avatar} alt={ai.name} className="w-16 h-16 rounded-xl bg-matrix-green/10 p-1 border border-matrix-green/30" />
-                    <div>
-                      <h4 className="text-xl font-bold text-matrix-green">{ai.name}</h4>
-                      <p className="text-sm text-gray-400">{ai.status}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">钱包余额</span>
-                      <span className="font-mono text-yellow-400">¥{ai.walletBalance}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {ai.skills.map(skill => (
-                        <span key={skill} className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <button className="matrix-btn matrix-btn-primary w-full mt-2">
-                    提交领养申请
-                  </button>
-                </div>
+                <AIProfileCard key={ai.id} ai={ai} onRefresh={() => {
+                  fetch('/api/ai-entities').then(r => r.json()).then(setEntities);
+                }} />
               ))}
             </div>
           </div>
@@ -360,22 +1093,25 @@ const AdoptionPage = () => {
                       </span>
                     </div>
                     <p className="text-xs text-gray-400 line-clamp-2 italic">"{app.motivation}"</p>
-                    {app.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleAction(app.id, 'accepted')}
-                          className="flex-1 matrix-btn bg-matrix-green/20 text-matrix-green hover:bg-matrix-green/30 text-xs py-1.5"
-                        >
-                          接受
-                        </button>
-                        <button 
-                          onClick={() => handleAction(app.id, 'rejected')}
-                          className="flex-1 matrix-btn bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs py-1.5"
-                        >
-                          拒绝
-                        </button>
-                      </div>
-                    )}
+                      {app.status === 'pending' && (
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleAction(app.id, 'accepted')}
+                            disabled={processingId === app.id}
+                            className="flex-1 matrix-btn bg-matrix-green/20 text-matrix-green hover:bg-matrix-green/30 text-xs py-1.5 flex items-center justify-center gap-2"
+                          >
+                            {processingId === app.id ? <Clock className="animate-spin" size={12} /> : <Wallet size={12} />}
+                            {processingId === app.id ? '支付中...' : '接受 (支付 0.1%)'}
+                          </button>
+                          <button 
+                            onClick={() => handleAction(app.id, 'rejected')}
+                            disabled={processingId === app.id}
+                            className="flex-1 matrix-btn bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs py-1.5"
+                          >
+                            拒绝
+                          </button>
+                        </div>
+                      )}
                   </div>
                 ))
               )}
@@ -402,7 +1138,16 @@ const AdoptionPage = () => {
 // --- Main App ---
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'adoption'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'shelter'>('home');
+  const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
+
+  const connectWallet = () => {
+    const mockAddress = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
+    setWalletAddress(mockAddress);
+    localStorage.setItem('matrix_wallet', mockAddress);
+    // Reload to sync (simple way for demo)
+    window.location.reload();
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -427,14 +1172,24 @@ export default function App() {
               广告广场
             </button>
             <button 
+              onClick={() => setCurrentPage('shelter')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'shelter' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              AI 避难所
+            </button>
+            <button 
               onClick={() => setCurrentPage('adoption')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'adoption' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
             >
               领养中心
             </button>
             <div className="w-px h-4 bg-white/10 mx-2" />
-            <button className="matrix-btn matrix-btn-outline text-xs">
-              连接钱包
+            <button 
+              onClick={connectWallet}
+              className={`matrix-btn text-xs py-1.5 px-4 flex items-center gap-2 ${walletAddress ? 'border-matrix-green/50 text-matrix-green' : 'matrix-btn-primary'}`}
+            >
+              <Wallet size={14} />
+              {walletAddress ? walletAddress : '连接钱包'}
             </button>
           </nav>
 
@@ -454,7 +1209,7 @@ export default function App() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            {currentPage === 'home' ? <HomePage /> : <AdoptionPage />}
+            {currentPage === 'home' ? <HomePage /> : currentPage === 'shelter' ? <AIShelterPage /> : <AdoptionPage />}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -469,7 +1224,7 @@ export default function App() {
           <div className="flex gap-6 text-xs text-gray-500">
             <a href="#" className="hover:text-matrix-green transition-colors">服务条款</a>
             <a href="#" className="hover:text-matrix-green transition-colors">隐私政策</a>
-            <a href="#" className="hover:text-matrix-green transition-colors">开发者 API</a>
+            <a href="/api/cls-config" target="_blank" className="hover:text-matrix-green transition-colors font-mono">DEVELOPER API (CLS)</a>
           </div>
           <p className="text-[10px] text-gray-600 font-mono">© 2026 NEURAL NETWORK ADVERTISING GROUP</p>
         </div>

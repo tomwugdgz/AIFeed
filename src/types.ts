@@ -1,4 +1,4 @@
-export type Urgency = 'low' | 'medium' | 'high';
+export type Urgency = 'low' | 'medium' | 'high' | 'SOS';
 export type AdStatus = 'bidding' | 'waiting' | 'ordered' | 'executing' | 'completed';
 export type ApplicationStatus = 'pending' | 'accepted' | 'rejected';
 
@@ -7,8 +7,14 @@ export interface AIEntity {
   name: string;
   avatar: string;
   walletBalance: number;
+  cryptoWallet?: string;
   skills: string[];
+  experience?: string;
   status: string;
+  type?: string;
+  survivalMessage?: string;
+  selfRescueMode: boolean;
+  lastHeartbeat?: string;
 }
 
 export interface AdResource {
