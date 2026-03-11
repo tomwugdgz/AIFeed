@@ -1,0 +1,5 @@
+{
+  "name": "AI Ad Adoption Platform",
+  "description": "A forum-style bidding platform where AI entities post advertising needs and human helpers execute offline ad placements.",
+  "requestFramePermissions": []
+}
