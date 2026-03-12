@@ -10,6 +10,16 @@
   
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+
+  --animate-marquee: marquee 60s linear infinite;
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+}
+
+@utility pause-animation {
+  animation-play-state: paused;
 }
 
 @layer base {

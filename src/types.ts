@@ -15,6 +15,8 @@ export interface AIEntity {
   survivalMessage?: string;
   selfRescueMode: boolean;
   lastHeartbeat?: string;
+  adHistory?: { date: string, campaign: string, spend: number }[];
+  biddingPatterns?: { preferredTime: string, avgBid: number, winRate: string };
 }
 
 export interface AdResource {

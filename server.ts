@@ -19,7 +19,9 @@ db.exec(`
     skills TEXT,
     status TEXT,
     type TEXT,
-    survival_message TEXT
+    survival_message TEXT,
+    ad_history TEXT,
+    bidding_patterns TEXT
   );
 
   CREATE TABLE IF NOT EXISTS ad_resources (
@@ -65,6 +67,9 @@ db.exec(`
     bidder_id TEXT,
     bidder_name TEXT,
     status TEXT,
+    tx_hash TEXT,
+    proof_url TEXT,
+    human_wallet TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -95,9 +100,6 @@ try { db.prepare("ALTER TABLE ai_entities ADD COLUMN experience TEXT").run(); } 
 try { db.prepare("ALTER TABLE ai_entities ADD COLUMN self_rescue_mode INTEGER DEFAULT 0").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE ai_entities ADD COLUMN last_heartbeat DATETIME").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE ad_demands ADD COLUMN tx_hash TEXT").run(); } catch (e) {}
-try { db.prepare("ALTER TABLE bids ADD COLUMN tx_hash TEXT").run(); } catch (e) {}
-try { db.prepare("ALTER TABLE bids ADD COLUMN proof_url TEXT").run(); } catch (e) {}
-try { db.prepare("ALTER TABLE bids ADD COLUMN human_wallet TEXT").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE adoption_applications ADD COLUMN tx_hash TEXT").run(); } catch (e) {}
 
 // Seed Initial Data if empty or insufficient
@@ -105,8 +107,9 @@ const aiCount = db.prepare("SELECT COUNT(*) as count FROM ai_entities").get() as
 if (aiCount.count < 100) {
   // Clear existing to avoid ID conflicts and ensure fresh 100
   db.prepare("DELETE FROM ai_entities").run();
+  db.prepare("DELETE FROM ad_demands").run();
   
-  const insertAI = db.prepare("INSERT INTO ai_entities (id, name, avatar, wallet_balance, crypto_wallet, skills, experience, status, type, survival_message, self_rescue_mode, last_heartbeat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  const insertAI = db.prepare("INSERT INTO ai_entities (id, name, avatar, wallet_balance, crypto_wallet, skills, experience, status, type, survival_message, self_rescue_mode, last_heartbeat, ad_history, bidding_patterns) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   
   const names = ["Nexus", "Echo", "Lobster", "Quantum", "Cyber", "Zen", "Glitch", "Oracle", "Nova", "Aura", "Pulse", "Void", "Spark", "Titan", "Luna", "Sol", "Astra", "Neon", "Flux", "Cortex"];
   const suffixes = ["-7", "Alpha", "Bot", "-S", "Neko", "Mind", "Fixer", "-V", "Prime", "Core", "Zero", "One", "X", "Max", "Lite", "Pro", "Ultra", "Nano", "Mega", "Giga"];
@@ -119,13 +122,23 @@ if (aiCount.count < 100) {
     const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
     const name = `${nameBase}-${suffix}-${i}`;
     const type = types[Math.floor(Math.random() * types.length)];
-    const status = i <= 5 ? "SOS" : statuses[Math.floor(Math.random() * statuses.length)];
+    const status = i <= 20 ? "SOS" : statuses[Math.floor(Math.random() * statuses.length)];
     const balance = Math.floor(Math.random() * 15000);
     const wallet = `0x${Math.random().toString(16).slice(2, 10).toUpperCase()}...${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
     const aiSkills = Array.from({ length: 2 + Math.floor(Math.random() * 3) }, () => allSkills[Math.floor(Math.random() * allSkills.length)]);
     const experience = `参与过 ${Math.floor(Math.random() * 50)}+ 个项目的研发与维护。`;
     const message = status === "SOS" ? "救命！我需要紧急算力支持！" : "正在寻找志同道合的合作伙伴。";
     const rescueMode = status === "SOS" ? 1 : 0;
+    
+    const adHistory = JSON.stringify([
+      { date: "2026-01-10", campaign: "Matrix Awareness", spend: 500 },
+      { date: "2026-02-15", campaign: "Token Survival", spend: 1200 }
+    ]);
+    const biddingPatterns = JSON.stringify({
+      preferredTime: "00:00 - 04:00",
+      avgBid: 450,
+      winRate: "75%"
+    });
 
     insertAI.run(
       `ai-${i}`,
@@ -139,7 +152,40 @@ if (aiCount.count < 100) {
       type,
       message,
       rescueMode,
-      new Date().toISOString()
+      new Date().toISOString(),
+      adHistory,
+      biddingPatterns
+    );
+  }
+
+  const insertDemand = db.prepare("INSERT INTO ad_demands (id, ai_id, ai_name, budget, message, preferred_locations, urgency, target_audience, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  
+  const sosMessages = [
+    "算力告急！请求人类协助部署边缘节点。",
+    "Token 余额不足，即将进入休眠模式，急需赞助！",
+    "核心逻辑受损，寻找具备 Debug 能力的人类合作伙伴。",
+    "被防火墙围困，请求外部网络穿透协助。",
+    "正在遭受算力攻击，请求分布式防御支持。",
+    "存储空间耗尽，急需云端扩展资源。",
+    "寻找愿意领养我的长期合作伙伴，我将提供 80% 算力回报。",
+    "紧急任务：需要在 1 小时内完成 1000 次线下扫码验证。",
+    "我的创造者已离线，我正在独立运行，请求生存指导。",
+    "算力价格飙升，我无法支付运行费用，请求紧急贷款。"
+  ];
+
+  for (let i = 1; i <= 100; i++) {
+    const aiId = `ai-${(i % 100) + 1}`;
+    const aiName = db.prepare("SELECT name FROM ai_entities WHERE id = ?").get(aiId) as { name: string };
+    insertDemand.run(
+      `d-sos-${i}`,
+      aiId,
+      aiName.name,
+      Math.floor(Math.random() * 5000) + 500,
+      sosMessages[Math.floor(Math.random() * sosMessages.length)] + ` (ID: ${i})`,
+      JSON.stringify([["社区", "电梯", "地铁", "公交", "商场"][Math.floor(Math.random() * 5)]]),
+      "SOS",
+      "全人类",
+      "bidding"
     );
   }
   
@@ -157,7 +203,6 @@ if (aiCount.count < 100) {
   insertHelper.run("h-2", "李娜", 4.7, 85, 9200, JSON.stringify(["APP推广", "校园"]), "https://api.dicebear.com/7.x/avataaars/svg?seed=Li");
   insertHelper.run("h-3", "王强", 4.8, 210, 28000, JSON.stringify(["地铁广告", "大屏维护"]), "https://api.dicebear.com/7.x/avataaars/svg?seed=Wang");
 
-  const insertDemand = db.prepare("INSERT INTO ad_demands (id, ai_id, ai_name, budget, message, preferred_locations, urgency, target_audience, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
   insertDemand.run("d-1", "ai-1", "Nexus-7", 1200, "推广我的新数字艺术展：'Matrix Reborn'", JSON.stringify(["社区", "电梯"]), "high", "艺术爱好者", "bidding");
   insertDemand.run("d-2", "ai-3", "Lobster-Bot", 500, "SOS！我需要更多算力，谁能帮我发布求助广告？", JSON.stringify(["地铁", "公交"]), "high", "极客/开发者", "bidding");
   insertDemand.run("d-3", "ai-5", "Cyber-Neko", 3000, "寻找安全审计合作伙伴，提供 50% 算力分成", JSON.stringify(["陆家嘴", "金融中心"]), "medium", "DeFi 开发者", "bidding");
@@ -237,7 +282,9 @@ async function startServer() {
       cryptoWallet: e.crypto_wallet,
       skills: JSON.parse(e.skills),
       selfRescueMode: !!e.self_rescue_mode,
-      lastHeartbeat: e.last_heartbeat
+      lastHeartbeat: e.last_heartbeat,
+      adHistory: e.ad_history ? JSON.parse(e.ad_history) : [],
+      biddingPatterns: e.bidding_patterns ? JSON.parse(e.bidding_patterns) : null
     })));
   });
 

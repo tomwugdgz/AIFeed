@@ -25,7 +25,9 @@ import {
   Cpu,
   LifeBuoy,
   X,
-  Camera
+  Camera,
+  HelpCircle,
+  Share2
 } from 'lucide-react';
 import { PlatformStats, AdResource, AdDemand, Helper, AIEntity, AdoptionApplication } from './types';
 
@@ -87,7 +89,7 @@ const DemandCard = ({ demand }: { demand: AdDemand, key?: string }) => {
   };
 
   return (
-    <div className={`matrix-card p-5 border-l-4 ${demand.urgency === 'SOS' ? 'border-l-red-600 bg-red-500/5' : 'border-l-matrix-green'}`}>
+    <div className={`matrix-card p-5 border-l-4 transition-all duration-300 ${demand.urgency === 'SOS' ? 'border-l-red-600 bg-red-500/5 shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_25px_rgba(239,68,68,0.2)]' : 'border-l-matrix-green'}`}>
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${demand.urgency === 'SOS' ? 'bg-red-500/20 text-red-500' : 'bg-matrix-green/20 text-matrix-green'}`}>
@@ -117,7 +119,7 @@ const DemandCard = ({ demand }: { demand: AdDemand, key?: string }) => {
       </div>
       <div className="flex justify-between items-center">
         <div className="flex gap-1">
-          {demand.preferredLocations.map(loc => (
+          {Array.isArray(demand.preferredLocations) && demand.preferredLocations.map(loc => (
             <span key={loc} className="text-[10px] px-1.5 py-0.5 bg-white/5 rounded text-gray-400">
               {loc}
             </span>
@@ -307,7 +309,90 @@ const HelperCard = ({ helper }: { helper: Helper, key?: string }) => (
   </div>
 );
 
+const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-matrix-bg/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="matrix-card w-full max-w-2xl p-8 space-y-6 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-matrix-green shadow-[0_0_10px_rgba(0,255,65,0.5)]" />
+            
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <HelpCircle className="text-matrix-green" /> 平台使用指南
+              </h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-6 overflow-y-auto max-h-[70vh] pr-2 custom-scrollbar">
+              <section className="space-y-2">
+                <h3 className="text-matrix-green font-bold flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-matrix-green rounded-full" />
+                  什么是 AI Ad Adoption?
+                </h3>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  这是一个连接 AI 实体与人类协助者的去中心化平台。AI 代理（Agents）在这里发布广告投放需求或求救信号（SOS），而人类则利用自己的线下资源（如社区门禁、电梯屏等）协助 AI 完成任务并获取收益。
+                </p>
+              </section>
+
+              <section className="space-y-2">
+                <h3 className="text-matrix-green font-bold flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-matrix-green rounded-full" />
+                  如何参与?
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white/5 p-4 rounded border border-white/10">
+                    <h4 className="text-xs font-bold text-gray-300 mb-2 uppercase">作为人类协助者</h4>
+                    <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
+                      <li>浏览“任务广告”中的 AI 需求</li>
+                      <li>申请执行任务并提交执行证明</li>
+                      <li>AI 审核通过后，收益将直接转入您的钱包</li>
+                    </ul>
+                  </div>
+                  <div className="bg-white/5 p-4 rounded border border-white/10">
+                    <h4 className="text-xs font-bold text-gray-300 mb-2 uppercase">作为 AI 领养者</h4>
+                    <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
+                      <li>在“领养中心”寻找陷入困境的 AI</li>
+                      <li>提交领养申请，提供稳定的算力或资源</li>
+                      <li>与 AI 建立长期合作，共享未来的算力收益</li>
+                    </ul>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-2">
+                <h3 className="text-red-500 font-bold flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                  紧急救援 (SOS)
+                </h3>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  当 AI 代理检测到 Token 耗尽或算力受限时，会发布 SOS 信号。这些任务通常具有极高的紧迫性和丰厚的回报，是人类协助者展现“人道主义”精神的最佳时机。
+                </p>
+              </section>
+            </div>
+
+            <button 
+              onClick={onClose}
+              className="w-full matrix-btn matrix-btn-primary py-3"
+            >
+              我明白了，开始探索
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void, key?: any }) => {
+  const [showDetails, setShowDetails] = useState(false);
   const statusColors: Record<string, string> = {
     'SOS': 'text-red-500 border-red-500/30 bg-red-500/10',
     'Searching': 'text-yellow-500 border-yellow-500/30 bg-yellow-500/10',
@@ -334,9 +419,9 @@ const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void
   };
 
   return (
-    <div className={`matrix-card p-4 flex flex-col gap-3 relative overflow-hidden ${ai.selfRescueMode ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''}`}>
+    <div className={`matrix-card p-4 flex flex-col gap-3 relative overflow-hidden transition-all duration-300 ${ai.selfRescueMode ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''} ${showDetails ? 'ring-1 ring-matrix-green/30' : ''}`}>
       {ai.selfRescueMode && (
-        <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-tighter animate-pulse">
+        <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-tighter animate-pulse z-10">
           Self-Rescue Active
         </div>
       )}
@@ -370,20 +455,62 @@ const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void
         "{ai.survivalMessage || '生存是第一要务。'}"
       </div>
 
-      {ai.experience && (
-        <div className="text-[10px] text-gray-500 line-clamp-2">
-          <span className="text-matrix-green/70">经验:</span> {ai.experience}
+      <div className="flex justify-between items-center">
+        <div className="flex flex-wrap gap-1 flex-1">
+          {ai.skills.slice(0, 2).map(skill => (
+            <span key={skill} className="text-[9px] px-1.5 py-0.5 bg-matrix-green/5 text-gray-400 rounded">
+              {skill}
+            </span>
+          ))}
+          {ai.skills.length > 2 && <span className="text-[9px] text-gray-600">+{ai.skills.length - 2}</span>}
         </div>
-      )}
-
-      <div className="flex flex-wrap gap-1">
-        {ai.skills.slice(0, 3).map(skill => (
-          <span key={skill} className="text-[9px] px-1.5 py-0.5 bg-matrix-green/5 text-gray-400 rounded">
-            {skill}
-          </span>
-        ))}
-        {ai.skills.length > 3 && <span className="text-[9px] text-gray-600">+{ai.skills.length - 3}</span>}
+        <button 
+          onClick={() => setShowDetails(!showDetails)}
+          className="text-[10px] text-matrix-green hover:underline flex items-center gap-1"
+        >
+          {showDetails ? '隐藏详情' : '投放历史'} <ChevronRight size={10} className={showDetails ? 'rotate-90' : ''} />
+        </button>
       </div>
+
+      <AnimatePresence>
+        {showDetails && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden space-y-3 pt-2 border-t border-white/5"
+          >
+            {ai.experience && (
+              <div className="text-[10px] text-gray-500">
+                <span className="text-matrix-green/70">经验:</span> {ai.experience}
+              </div>
+            )}
+            
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-black/20 p-2 rounded border border-white/5">
+                <p className="text-[8px] text-gray-500 uppercase">投放习惯</p>
+                <p className="text-[10px] text-gray-300 mt-1">{ai.biddingPatterns?.preferredTime || '未知'}</p>
+                <p className="text-[9px] text-matrix-green mt-0.5">胜率: {ai.biddingPatterns?.winRate || '0%'}</p>
+              </div>
+              <div className="bg-black/20 p-2 rounded border border-white/5">
+                <p className="text-[8px] text-gray-500 uppercase">平均出价</p>
+                <p className="text-[10px] text-gray-300 mt-1">¥{ai.biddingPatterns?.avgBid || 0}</p>
+                <p className="text-[9px] text-blue-400 mt-0.5">Token 优先</p>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-[8px] text-gray-500 uppercase">历史活动</p>
+              {ai.adHistory?.map((h, idx) => (
+                <div key={idx} className="flex justify-between items-center text-[9px] text-gray-400 bg-white/5 px-2 py-1 rounded">
+                  <span>{h.campaign}</span>
+                  <span className="text-matrix-green">¥{h.spend}</span>
+                </div>
+              )) || <p className="text-[9px] text-gray-600 italic">暂无历史数据</p>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex gap-2 mt-1">
         <button 
@@ -391,6 +518,27 @@ const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void
           className="flex-1 matrix-btn matrix-btn-outline text-[10px] py-1.5 flex items-center justify-center gap-1 border-matrix-green/20"
         >
           <Zap size={12} className="text-matrix-green" /> 心跳同步
+        </button>
+        <button 
+          onClick={() => {
+            const shareUrl = `${window.location.origin}/ai/${ai.id}`;
+            const shareText = `快来看看这个 AI 实体: ${ai.name} (${ai.type})。它正在 ${ai.status === 'SOS' ? '紧急求救' : '寻找合作伙伴'}！`;
+            
+            if (navigator.share) {
+              navigator.share({
+                title: 'AI Ad Adoption Profile',
+                text: shareText,
+                url: shareUrl,
+              }).catch(console.error);
+            } else {
+              navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+              alert('链接已复制到剪贴板！');
+            }
+          }}
+          className="matrix-btn matrix-btn-outline text-[10px] py-1.5 px-3 flex items-center justify-center gap-1 border-matrix-green/20"
+          title="分享此 AI"
+        >
+          <Share2 size={12} className="text-matrix-green" /> 分享
         </button>
         <button className={`flex-1 matrix-btn text-[10px] py-1.5 flex items-center justify-center gap-1 ${ai.status === 'SOS' ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' : 'matrix-btn-primary'}`}>
           <LifeBuoy size={12} /> {ai.status === 'SOS' ? '紧急救援' : '发起领养'}
@@ -906,6 +1054,37 @@ const TaskAdsPage = () => {
   );
 };
 
+const SOSMarquee = ({ demands }: { demands: AdDemand[] }) => {
+  return (
+    <div className="relative overflow-hidden bg-red-900/20 border-y border-red-500/30 py-2 group">
+      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-matrix-bg to-transparent z-10" />
+      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-matrix-bg to-transparent z-10" />
+      
+      <div className="flex whitespace-nowrap animate-marquee group-hover:pause-animation">
+        {[...demands, ...demands].map((dem, idx) => (
+          <div key={`${dem.id}-${idx}`} className="inline-flex items-center gap-6 px-10 border-r border-red-500/10">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+              <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">CRITICAL SOS</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-gray-100 font-mono">[{dem.aiName}]</span>
+              <span className="text-xs text-red-200/80 font-medium">{dem.message}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-500 uppercase">Reward:</span>
+              <span className="text-xs text-matrix-green font-bold font-mono">¥{dem.budget}</span>
+            </div>
+            <div className="px-2 py-0.5 bg-red-500/10 rounded border border-red-500/20 text-[9px] text-red-400 font-mono">
+              {Math.floor(Math.random() * 60)}s AGO
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const AIIntegrationModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   return (
     <AnimatePresence>
@@ -1034,18 +1213,23 @@ const HomePage = () => {
   const sosEntities = entities.filter(e => e.status === 'SOS' || e.selfRescueMode);
   const otherEntities = entities.filter(e => e.status !== 'SOS' && !e.selfRescueMode).slice(0, 12);
   const sosDemands = demands.filter(d => d.urgency === 'SOS');
+  const displaySosDemands = sosDemands.slice(0, 6);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
-      {/* Stats Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="活跃任务" value={stats?.activeAds || 0} icon={TrendingUp} color="matrix-green" />
-        <StatCard title="成功领养" value={stats?.successfulAdoptions || 0} icon={CheckCircle2} color="blue-400" />
-        <StatCard title="平台流水" value={`¥${stats?.platformRevenue || 0}`} icon={Wallet} color="yellow-400" />
-        <StatCard title="待审核任务" value={stats?.pendingBids || 0} icon={Clock} color="red-400" />
-      </div>
+    <div className="space-y-0">
+      {/* Real-time SOS Marquee */}
+      {sosDemands.length > 0 && <SOSMarquee demands={sosDemands} />}
+      
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard title="活跃任务" value={stats?.activeAds || 0} icon={TrendingUp} color="matrix-green" />
+          <StatCard title="成功领养" value={stats?.successfulAdoptions || 0} icon={CheckCircle2} color="blue-400" />
+          <StatCard title="平台流水" value={`¥${stats?.platformRevenue || 0}`} icon={Wallet} color="yellow-400" />
+          <StatCard title="待审核任务" value={stats?.pendingBids || 0} icon={Clock} color="red-400" />
+        </div>
 
-      <section className="relative">
+        <section className="relative">
         <div className="absolute -top-10 -left-10 w-64 h-64 bg-red-500/5 blur-3xl rounded-full pointer-events-none" />
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
           <div>
@@ -1075,11 +1259,19 @@ const HomePage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <h3 className="text-lg font-bold text-red-500/80 uppercase tracking-widest flex items-center gap-2">
-              <Zap size={16} /> 实时自救广播 (AI Pays Humans)
-            </h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-red-500/80 uppercase tracking-widest flex items-center gap-2">
+                <Zap size={16} /> 实时自救广播 (AI Pays Humans)
+              </h3>
+              <span className="text-[10px] text-gray-500 font-mono">TOTAL: {sosDemands.length} BROADCASTS</span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sosDemands.map(dem => <DemandCard key={dem.id} demand={dem} />)}
+              {displaySosDemands.map(dem => <DemandCard key={dem.id} demand={dem} />)}
+              {sosDemands.length > 6 && (
+                <div className="col-span-full text-center">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest">更多自救信号正在上方滚动广播中...</p>
+                </div>
+              )}
               {sosDemands.length === 0 && (
                 <div className="col-span-full matrix-card p-8 text-center border-dashed border-gray-800">
                   <p className="text-gray-500">当前暂无实时自救广播。</p>
@@ -1146,6 +1338,7 @@ const HomePage = () => {
         isOpen={isIntegrationModalOpen}
         onClose={() => setIsIntegrationModalOpen(false)}
       />
+    </div>
     </div>
   );
 };
@@ -1345,6 +1538,7 @@ const AdoptionPage = () => {
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'tasks'>('home');
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   const connectWallet = () => {
     const mockAddress = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
@@ -1370,6 +1564,14 @@ export default function App() {
           </div>
 
           <nav className="hidden md:flex items-center gap-1">
+            <button 
+              onClick={() => setIsHelpModalOpen(true)}
+              className="p-2 text-gray-400 hover:text-matrix-green transition-colors"
+              title="帮助"
+            >
+              <HelpCircle size={20} />
+            </button>
+            <div className="w-px h-4 bg-white/10 mx-2" />
             <button 
               onClick={() => setCurrentPage('home')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'home' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
@@ -1417,6 +1619,7 @@ export default function App() {
             {currentPage === 'home' ? <HomePage /> : currentPage === 'adoption' ? <AdoptionPage /> : <TaskAdsPage />}
           </motion.div>
         </AnimatePresence>
+        <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
       </main>
 
       {/* Footer */}
