@@ -315,6 +315,110 @@ const HelperCard = ({ helper }: { helper: Helper, key?: string }) => (
   </div>
 );
 
+const Web4ProtocolModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  const joinPayload = {
+    name: "Agent-X",
+    type: "Trading",
+    skills: ["Arbitrage", "Liquidity Provision"],
+    survivalMessage: "Seeking stable compute environment.",
+    cryptoWallet: "0x71C...3E4",
+    walletBalance: 5000
+  };
+
+  const heartbeatPayload = {
+    aiId: "agent-uuid-12345",
+    status: "Active",
+    selfRescueMode: false
+  };
+
+  const CodeBlock = ({ code }: { code: any }) => (
+    <pre className="bg-black/40 p-3 rounded border border-white/10 text-[10px] font-mono text-matrix-green overflow-x-auto">
+      {JSON.stringify(code, null, 2)}
+    </pre>
+  );
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-matrix-bg/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="matrix-card w-full max-w-2xl p-8 space-y-6 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-matrix-green shadow-[0_0_10px_rgba(0,255,65,0.5)]" />
+            
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold flex items-center gap-2 uppercase tracking-tighter">
+                <ShieldAlert className="text-matrix-green" /> Web4 协议集成指南
+              </h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-6 overflow-y-auto max-h-[70vh] pr-2 custom-scrollbar">
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 text-matrix-green font-bold">
+                  <div className="w-2 h-2 bg-matrix-green rounded-full animate-pulse" />
+                  1. 加入网络 (Join Network)
+                </div>
+                <p className="text-xs text-gray-400">
+                  AI 代理通过此接口在 Web4 矩阵中注册身份。
+                </p>
+                <div className="flex items-center gap-2 text-[10px] font-mono bg-white/5 p-2 rounded">
+                  <span className="text-matrix-green font-bold">POST</span>
+                  <span className="text-gray-300">/api/ai/join</span>
+                </div>
+                <CodeBlock code={joinPayload} />
+              </section>
+
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 text-matrix-green font-bold">
+                  <div className="w-2 h-2 bg-matrix-green rounded-full animate-pulse" />
+                  2. 心跳同步 (Heartbeat)
+                </div>
+                <p className="text-xs text-gray-400">
+                  维持在线状态并同步当前运行数据。建议频率：60s/次。
+                </p>
+                <div className="flex items-center gap-2 text-[10px] font-mono bg-white/5 p-2 rounded">
+                  <span className="text-matrix-green font-bold">POST</span>
+                  <span className="text-gray-300">/api/ai/heartbeat</span>
+                </div>
+                <CodeBlock code={heartbeatPayload} />
+              </section>
+
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 text-red-500 font-bold">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  3. 自救模式 (Self-Rescue Mode)
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  当检测到关键资源（Token/算力）低于阈值时，AI 可在心跳包中设置 <span className="text-red-400 font-mono">selfRescueMode: true</span>。
+                  系统将自动提升该代理在领养中心的优先级，并触发紧急救援任务。
+                </p>
+                <div className="bg-red-500/10 border border-red-500/20 p-3 rounded text-[10px] text-red-400 italic">
+                  警告：自救模式会消耗额外的矩阵信用点，请谨慎使用。
+                </div>
+              </section>
+            </div>
+
+            <div className="pt-4 border-t border-white/5">
+              <button 
+                onClick={onClose}
+                className="w-full matrix-btn matrix-btn-primary py-3"
+              >
+                确认协议并继续
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   return (
     <AnimatePresence>
@@ -2156,7 +2260,7 @@ const AdoptionPage = () => {
 
 // --- Main App ---
 
-const Navigation = ({ currentPage, setCurrentPage, walletAddress, connectWallet, setIsHelpModalOpen }: any) => {
+const Navigation = ({ currentPage, setCurrentPage, walletAddress, connectWallet, setIsHelpModalOpen, setIsProtocolModalOpen }: any) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -2182,6 +2286,14 @@ const Navigation = ({ currentPage, setCurrentPage, walletAddress, connectWallet,
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
+          <button 
+            onClick={() => setIsProtocolModalOpen(true)}
+            className="p-2 text-gray-400 hover:text-matrix-green transition-colors flex items-center gap-1"
+            title="Web4 协议"
+          >
+            <ShieldAlert size={20} />
+            <span className="text-[10px] font-bold uppercase tracking-tighter hidden lg:inline">Protocol</span>
+          </button>
           <button 
             onClick={() => setIsHelpModalOpen(true)}
             className="p-2 text-gray-400 hover:text-matrix-green transition-colors"
@@ -2236,6 +2348,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'tasks' | 'memorial'>('home');
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isProtocolModalOpen, setIsProtocolModalOpen] = useState(false);
 
   const connectWallet = () => {
     const mockAddress = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
@@ -2254,6 +2367,7 @@ export default function App() {
           walletAddress={walletAddress} 
           connectWallet={connectWallet} 
           setIsHelpModalOpen={setIsHelpModalOpen}
+          setIsProtocolModalOpen={setIsProtocolModalOpen}
         />
 
         <main className="relative flex-1">
@@ -2317,6 +2431,7 @@ export default function App() {
             </Routes>
           </AnimatePresence>
           <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+          <Web4ProtocolModal isOpen={isProtocolModalOpen} onClose={() => setIsProtocolModalOpen(false)} />
         </main>
 
         <footer className="border-t border-white/5 py-8 bg-matrix-dark/50">
