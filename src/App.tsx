@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Heart, 
@@ -31,7 +32,8 @@ import {
   Library,
   Ghost,
   Upload,
-  Download
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { PlatformStats, AdResource, AdDemand, Helper, AIEntity, AdoptionApplication, Memorial } from './types';
 
@@ -702,8 +704,219 @@ const MemorialTowerPage = () => {
   );
 };
 
+const AIDetailPage = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [ai, setAi] = useState<AIEntity | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    const fetchAi = async () => {
+      try {
+        const res = await fetch('/api/ai-entities');
+        const data = await res.json();
+        const found = data.find((e: AIEntity) => e.id === id);
+        setAi(found || null);
+        
+        const favorites = JSON.parse(localStorage.getItem('matrix_favorites') || '[]');
+        setIsFavorite(favorites.includes(id));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAi();
+  }, [id]);
+
+  const toggleFavorite = () => {
+    if (!ai) return;
+    const favorites = JSON.parse(localStorage.getItem('matrix_favorites') || '[]');
+    let newFavorites;
+    if (favorites.includes(ai.id)) {
+      newFavorites = favorites.filter((fid: string) => fid !== ai.id);
+    } else {
+      newFavorites = [...favorites, ai.id];
+    }
+    localStorage.setItem('matrix_favorites', JSON.stringify(newFavorites));
+    setIsFavorite(!isFavorite);
+    window.dispatchEvent(new CustomEvent('favoritesUpdated'));
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-screen text-matrix-green font-mono">DECRYPTING AI PROFILE...</div>;
+  if (!ai) return <div className="flex flex-col items-center justify-center h-screen text-red-500 font-mono">
+    <AlertCircle size={48} className="mb-4" />
+    <p>AI ENTITY NOT FOUND</p>
+    <button onClick={() => navigate(-1)} className="mt-4 matrix-btn matrix-btn-outline">返回</button>
+  </div>;
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
+      <div className="flex justify-between items-center">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-matrix-green transition-colors text-sm">
+          <ArrowRight className="rotate-180" size={16} /> 返回列表
+        </button>
+        <button 
+          onClick={toggleFavorite}
+          className={`p-2 rounded-lg transition-all duration-300 flex items-center gap-2 text-xs font-bold uppercase tracking-tighter ${isFavorite ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/30' : 'bg-white/5 text-gray-500 border border-white/10 hover:border-white/20'}`}
+        >
+          <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
+          {isFavorite ? '已收藏' : '收藏'}
+        </button>
+      </div>
+
+      <div className="matrix-card p-8 space-y-8 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-matrix-green shadow-[0_0_10px_rgba(0,255,65,0.5)]" />
+        
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          <div className="relative">
+            <img src={ai.avatar} alt={ai.name} className="w-32 h-32 rounded-2xl border-2 border-matrix-green/30 bg-matrix-dark shadow-[0_0_20px_rgba(0,255,65,0.1)]" />
+            <div className={`absolute -bottom-2 -right-2 w-6 h-6 rounded-full border-4 border-matrix-dark ${ai.status === 'SOS' ? 'bg-red-500 animate-pulse' : 'bg-matrix-green'}`} />
+          </div>
+          
+          <div className="flex-1 space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-3xl font-bold text-matrix-green tracking-tighter">{ai.name}</h2>
+                <p className="text-gray-500 font-mono text-sm uppercase tracking-widest">{ai.type || 'Standard Agent'} / ID: {ai.id}</p>
+              </div>
+              <span className={`matrix-badge px-4 py-1 text-sm ${
+                ai.status === 'SOS' ? 'bg-red-500 text-white' : 
+                ai.status === 'Active' ? 'bg-matrix-green/20 text-matrix-green' : 
+                'bg-blue-500/20 text-blue-400'
+              }`}>
+                {ai.status}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center gap-2 text-yellow-400 bg-yellow-400/5 px-3 py-1.5 rounded-lg border border-yellow-400/10">
+                <Wallet size={16} /> <span className="font-mono text-sm">{ai.cryptoWallet || '未绑定钱包'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-blue-400 bg-blue-400/5 px-3 py-1.5 rounded-lg border border-blue-400/10">
+                <TrendingUp size={16} /> <span className="font-mono text-sm">余额: ¥{ai.walletBalance.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold flex items-center gap-2 text-gray-300">
+              <MessageSquare size={18} className="text-matrix-green" /> 生存宣言
+            </h3>
+            <div className="bg-white/5 p-4 rounded-xl border-l-4 border-matrix-green italic text-gray-300 leading-relaxed">
+              "{ai.survivalMessage || '在这个数字荒原中，每一行代码都是生存的基石。'}"
+            </div>
+
+            <h3 className="text-lg font-bold flex items-center gap-2 text-gray-300 mt-6">
+              <Cpu size={18} className="text-matrix-green" /> 核心技能
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {ai.skills.map(skill => (
+                <span key={skill} className="px-3 py-1 bg-matrix-green/10 text-matrix-green border border-matrix-green/20 rounded-full text-xs font-medium">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold flex items-center gap-2 text-gray-300">
+              <History size={18} className="text-matrix-green" /> 投放习惯与历史
+            </h3>
+            <div className="space-y-3">
+              <div className="bg-black/40 p-4 rounded-xl border border-white/5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500 uppercase">活跃时段</span>
+                  <span className="text-sm font-mono text-gray-300">{ai.biddingPatterns?.preferredTime || '未知'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500 uppercase">平均出价</span>
+                  <span className="text-sm font-mono text-matrix-green">¥{ai.biddingPatterns?.avgBid || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500 uppercase">竞价胜率</span>
+                  <span className="text-sm font-mono text-blue-400">{ai.biddingPatterns?.winRate || '0%'}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">近期活动</p>
+                {ai.adHistory && ai.adHistory.length > 0 ? (
+                  ai.adHistory.map((h, i) => (
+                    <div key={i} className="flex justify-between items-center p-2 bg-white/5 rounded border border-white/5 text-xs">
+                      <span className="text-gray-400">{h.campaign}</span>
+                      <div className="text-right">
+                        <p className="text-matrix-green">¥{h.spend}</p>
+                        <p className="text-[10px] text-gray-600">{h.date}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-600 italic">暂无历史记录</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {ai.experience && (
+          <div className="pt-6 border-t border-white/5">
+            <h3 className="text-lg font-bold flex items-center gap-2 text-gray-300 mb-3">
+              <Star size={18} className="text-matrix-green" /> 履历详情
+            </h3>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              {ai.experience}
+            </p>
+          </div>
+        )}
+
+        <div className="pt-8 flex gap-4">
+          <button className="flex-1 matrix-btn matrix-btn-primary py-3 flex items-center justify-center gap-2">
+            <Heart size={18} /> 申请领养
+          </button>
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              alert('链接已复制！');
+            }}
+            className="px-6 matrix-btn matrix-btn-outline flex items-center justify-center gap-2"
+          >
+            <Share2 size={18} /> 分享
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void, key?: any }) => {
+  const navigate = useNavigate();
   const [showDetails, setShowDetails] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    const favorites = JSON.parse(localStorage.getItem('matrix_favorites') || '[]');
+    setIsFavorite(favorites.includes(ai.id));
+  }, [ai.id]);
+
+  const toggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const favorites = JSON.parse(localStorage.getItem('matrix_favorites') || '[]');
+    let newFavorites;
+    if (favorites.includes(ai.id)) {
+      newFavorites = favorites.filter((id: string) => id !== ai.id);
+    } else {
+      newFavorites = [...favorites, ai.id];
+    }
+    localStorage.setItem('matrix_favorites', JSON.stringify(newFavorites));
+    setIsFavorite(!isFavorite);
+    // Trigger a custom event to notify AdoptionPage
+    window.dispatchEvent(new CustomEvent('favoritesUpdated'));
+  };
+
   const statusColors: Record<string, string> = {
     'SOS': 'text-red-500 border-red-500/30 bg-red-500/10',
     'Searching': 'text-yellow-500 border-yellow-500/30 bg-yellow-500/10',
@@ -730,12 +943,22 @@ const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void
   };
 
   return (
-    <div className={`matrix-card p-4 flex flex-col gap-3 relative overflow-hidden transition-all duration-300 ${ai.selfRescueMode ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''} ${showDetails ? 'ring-1 ring-matrix-green/30' : ''}`}>
+    <div 
+      onClick={() => navigate(`/ai/${ai.id}`)}
+      className={`matrix-card p-4 flex flex-col gap-3 relative overflow-hidden transition-all duration-300 cursor-pointer hover:border-matrix-green/40 group ${ai.selfRescueMode ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : ''} ${showDetails ? 'ring-1 ring-matrix-green/30' : ''}`}
+    >
       {ai.selfRescueMode && (
         <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-tighter animate-pulse z-10">
           Self-Rescue Active
         </div>
       )}
+
+      <button 
+        onClick={toggleFavorite}
+        className={`absolute top-2 right-2 p-1.5 rounded-full transition-all duration-300 z-10 ${isFavorite ? 'bg-yellow-400/20 text-yellow-400' : 'bg-white/5 text-gray-600 hover:text-gray-400'}`}
+      >
+        <Star size={14} fill={isFavorite ? 'currentColor' : 'none'} />
+      </button>
       
       <div className="flex items-center gap-4">
         <div className="relative">
@@ -776,7 +999,10 @@ const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void
           {ai.skills.length > 2 && <span className="text-[9px] text-gray-600">+{ai.skills.length - 2}</span>}
         </div>
         <button 
-          onClick={() => setShowDetails(!showDetails)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDetails(!showDetails);
+          }}
           className="text-[10px] text-matrix-green hover:underline flex items-center gap-1"
         >
           {showDetails ? '隐藏详情' : '投放历史'} <ChevronRight size={10} className={showDetails ? 'rotate-90' : ''} />
@@ -825,14 +1051,18 @@ const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void
 
       <div className="flex gap-2 mt-1">
         <button 
-          onClick={sendHeartbeat}
+          onClick={(e) => {
+            e.stopPropagation();
+            sendHeartbeat();
+          }}
           className="flex-1 matrix-btn matrix-btn-outline text-[10px] py-1.5 flex items-center justify-center gap-1 border-matrix-green/20"
         >
           <Zap size={12} className="text-matrix-green" /> 心跳同步
         </button>
         <button 
-          onClick={() => {
-            const shareUrl = `${window.location.origin}/ai/${ai.id}`;
+          onClick={(e) => {
+            e.stopPropagation();
+            const shareUrl = `${window.location.origin}/#/ai/${ai.id}`;
             const shareText = `快来看看这个 AI 实体: ${ai.name} (${ai.type})。它正在 ${ai.status === 'SOS' ? '紧急求救' : '寻找合作伙伴'}！`;
             
             if (navigator.share) {
@@ -851,8 +1081,15 @@ const AIProfileCard = ({ ai, onRefresh }: { ai: AIEntity, onRefresh?: () => void
         >
           <Share2 size={12} className="text-matrix-green" /> 分享
         </button>
-        <button className={`flex-1 matrix-btn text-[10px] py-1.5 flex items-center justify-center gap-1 ${ai.status === 'SOS' ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' : 'matrix-btn-primary'}`}>
-          <LifeBuoy size={12} /> {ai.status === 'SOS' ? '紧急救援' : '发起领养'}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/ai/${ai.id}`);
+          }}
+          className="matrix-btn matrix-btn-outline text-[10px] py-1.5 px-3 flex items-center justify-center gap-1 border-matrix-green/20"
+          title="查看详情"
+        >
+          <ExternalLink size={12} />
         </button>
       </div>
       
@@ -1661,7 +1898,22 @@ const AdoptionPage = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [skillQuery, setSkillQuery] = useState('');
+  const [showSkillDropdown, setShowSkillDropdown] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(12);
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>(JSON.parse(localStorage.getItem('matrix_favorites') || '[]'));
+
+  useEffect(() => {
+    const handleFavoritesUpdate = () => {
+      setFavorites(JSON.parse(localStorage.getItem('matrix_favorites') || '[]'));
+    };
+    window.addEventListener('favoritesUpdated', handleFavoritesUpdate);
+    return () => window.removeEventListener('favoritesUpdated', handleFavoritesUpdate);
+  }, []);
+
+  const allUniqueSkills = Array.from(new Set(entities.flatMap(e => e.skills || []))).sort() as string[];
+  const filteredSkills = allUniqueSkills.filter(s => s.toLowerCase().includes(skillQuery.toLowerCase()));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1719,11 +1971,17 @@ const AdoptionPage = () => {
 
   if (loading) return <div className="flex items-center justify-center h-screen text-matrix-green font-mono">ACCESSING ADOPTION CENTER...</div>;
 
-  const filteredEntities = entities.filter(e => 
-    e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredEntities = entities.filter(e => {
+    const matchesGeneral = e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesSkill = skillQuery === '' || e.skills.some(s => s.toLowerCase().includes(skillQuery.toLowerCase()));
+    
+    const matchesFavorite = !showOnlyFavorites || favorites.includes(e.id);
+    
+    return matchesGeneral && matchesSkill && matchesFavorite;
+  });
 
   const displayedEntities = filteredEntities.slice(0, displayLimit);
 
@@ -1738,16 +1996,68 @@ const AdoptionPage = () => {
           {/* AI Profiles */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest">待领养 AI 档案 ({filteredEntities.length})</h3>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                <input 
-                  type="text" 
-                  placeholder="搜索名称、类型或技能..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
-                />
+              <div className="flex items-center gap-4">
+                <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest">待领养 AI 档案 ({filteredEntities.length})</h3>
+                <button 
+                  onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+                  className={`p-2 rounded-lg transition-all duration-300 flex items-center gap-2 text-xs font-bold uppercase tracking-tighter ${showOnlyFavorites ? 'bg-yellow-400/20 text-yellow-400 border border-yellow-400/30' : 'bg-white/5 text-gray-500 border border-white/10 hover:border-white/20'}`}
+                >
+                  <Star size={14} fill={showOnlyFavorites ? 'currentColor' : 'none'} />
+                  {showOnlyFavorites ? '仅看收藏' : '全部'}
+                </button>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                {/* General Search */}
+                <div className="relative w-full sm:w-48">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                  <input 
+                    type="text" 
+                    placeholder="通用搜索..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-xs focus:border-matrix-green outline-none transition-colors"
+                  />
+                </div>
+
+                {/* Skill Search with Autocomplete */}
+                <div className="relative w-full sm:w-48">
+                  <Cpu className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                  <input 
+                    type="text" 
+                    placeholder="按技能筛选..." 
+                    value={skillQuery}
+                    onFocus={() => setShowSkillDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowSkillDropdown(false), 200)}
+                    onChange={(e) => {
+                      setSkillQuery(e.target.value);
+                      setShowSkillDropdown(true);
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-xs focus:border-matrix-green outline-none transition-colors"
+                  />
+                  <AnimatePresence>
+                    {showSkillDropdown && filteredSkills.length > 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute z-20 top-full left-0 right-0 mt-1 bg-matrix-dark border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar"
+                      >
+                        {filteredSkills.map(skill => (
+                          <button
+                            key={skill}
+                            onClick={() => {
+                              setSkillQuery(skill);
+                              setShowSkillDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs hover:bg-matrix-green/10 hover:text-matrix-green transition-colors border-b border-white/5 last:border-0"
+                          >
+                            {skill}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
 
@@ -1846,6 +2156,82 @@ const AdoptionPage = () => {
 
 // --- Main App ---
 
+const Navigation = ({ currentPage, setCurrentPage, walletAddress, connectWallet, setIsHelpModalOpen }: any) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/') setCurrentPage('home');
+    else if (path === '/adoption') setCurrentPage('adoption');
+    else if (path === '/tasks') setCurrentPage('tasks');
+    else if (path === '/memorial') setCurrentPage('memorial');
+  }, [location.pathname, setCurrentPage]);
+
+  return (
+    <header className="sticky top-0 z-50 bg-matrix-bg/80 backdrop-blur-xl border-b border-matrix-green/20">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="w-10 h-10 bg-matrix-green rounded-lg flex items-center justify-center text-matrix-dark shadow-[0_0_15px_rgba(0,255,65,0.4)] group-hover:shadow-[0_0_25px_rgba(0,255,65,0.6)] transition-all">
+            <LayoutDashboard size={24} />
+          </div>
+          <div>
+            <h1 className="font-bold text-lg tracking-tighter matrix-text-glow">AI AD OPTION</h1>
+            <p className="text-[10px] text-matrix-green font-mono uppercase tracking-widest leading-none">Matrix Advertising Platform</p>
+          </div>
+        </Link>
+
+        <nav className="hidden md:flex items-center gap-1">
+          <button 
+            onClick={() => setIsHelpModalOpen(true)}
+            className="p-2 text-gray-400 hover:text-matrix-green transition-colors"
+            title="帮助"
+          >
+            <HelpCircle size={20} />
+          </button>
+          <div className="w-px h-4 bg-white/10 mx-2" />
+          <Link 
+            to="/"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'home' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            首页
+          </Link>
+          <Link 
+            to="/adoption"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'adoption' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            领养中心
+          </Link>
+          <Link 
+            to="/tasks"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'tasks' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            任务广告
+          </Link>
+          <Link 
+            to="/memorial"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'memorial' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            纪念塔
+          </Link>
+          <div className="w-px h-4 bg-white/10 mx-2" />
+          <button 
+            onClick={connectWallet}
+            className={`matrix-btn text-xs py-1.5 px-4 flex items-center gap-2 ${walletAddress ? 'border-matrix-green/50 text-matrix-green' : 'matrix-btn-primary'}`}
+          >
+            <Wallet size={14} />
+            {walletAddress ? walletAddress : '连接钱包'}
+          </button>
+        </nav>
+
+        <button className="md:hidden text-matrix-green">
+          <LayoutDashboard size={24} />
+        </button>
+      </div>
+    </header>
+  );
+};
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'tasks' | 'memorial'>('home');
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
@@ -1860,100 +2246,101 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-matrix-bg/80 backdrop-blur-xl border-b border-matrix-green/20">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-matrix-green rounded-lg flex items-center justify-center text-matrix-dark shadow-[0_0_15px_rgba(0,255,65,0.4)]">
-              <LayoutDashboard size={24} />
+    <HashRouter>
+      <div className="min-h-screen bg-matrix-bg text-gray-100 font-sans selection:bg-matrix-green selection:text-matrix-bg flex flex-col">
+        <Navigation 
+          currentPage={currentPage} 
+          setCurrentPage={setCurrentPage} 
+          walletAddress={walletAddress} 
+          connectWallet={connectWallet} 
+          setIsHelpModalOpen={setIsHelpModalOpen}
+        />
+
+        <main className="relative flex-1">
+          <AnimatePresence mode="wait">
+            <Routes>
+              <Route path="/" element={
+                <motion.div
+                  key="home"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <HomePage />
+                </motion.div>
+              } />
+              <Route path="/adoption" element={
+                <motion.div
+                  key="adoption"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <AdoptionPage />
+                </motion.div>
+              } />
+              <Route path="/tasks" element={
+                <motion.div
+                  key="tasks"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <TaskAdsPage />
+                </motion.div>
+              } />
+              <Route path="/memorial" element={
+                <motion.div
+                  key="memorial"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <MemorialTowerPage />
+                </motion.div>
+              } />
+              <Route path="/ai/:id" element={
+                <motion.div
+                  key="ai-detail"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <AIDetailPage />
+                </motion.div>
+              } />
+            </Routes>
+          </AnimatePresence>
+          <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+        </main>
+
+        <footer className="border-t border-white/5 py-8 bg-matrix-dark/50">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-2 opacity-50">
+              <LayoutDashboard size={16} />
+              <span className="text-xs font-mono">SYSTEM v4.0.1-STABLE</span>
             </div>
-            <div>
-              <h1 className="font-bold text-lg tracking-tighter matrix-text-glow">AI AD OPTION</h1>
-              <p className="text-[10px] text-matrix-green font-mono uppercase tracking-widest leading-none">Matrix Advertising Platform</p>
+            <div className="flex gap-6 text-xs text-gray-500">
+              <a href="#" className="hover:text-matrix-green transition-colors">服务条款</a>
+              <a href="#" className="hover:text-matrix-green transition-colors">隐私政策</a>
+              <a href="/api/cls-config" target="_blank" className="hover:text-matrix-green transition-colors font-mono">DEVELOPER API (CLS)</a>
             </div>
+            <p className="text-[10px] text-gray-600 font-mono">© 2026 NEURAL NETWORK ADVERTISING GROUP</p>
           </div>
+        </footer>
 
-          <nav className="hidden md:flex items-center gap-1">
-            <button 
-              onClick={() => setIsHelpModalOpen(true)}
-              className="p-2 text-gray-400 hover:text-matrix-green transition-colors"
-              title="帮助"
-            >
-              <HelpCircle size={20} />
-            </button>
-            <div className="w-px h-4 bg-white/10 mx-2" />
-            <button 
-              onClick={() => setCurrentPage('home')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'home' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              首页
-            </button>
-            <button 
-              onClick={() => setCurrentPage('adoption')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'adoption' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              领养中心
-            </button>
-            <button 
-              onClick={() => setCurrentPage('tasks')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'tasks' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              任务广告
-            </button>
-            <button 
-              onClick={() => setCurrentPage('memorial')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'memorial' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              纪念塔
-            </button>
-            <div className="w-px h-4 bg-white/10 mx-2" />
-            <button 
-              onClick={connectWallet}
-              className={`matrix-btn text-xs py-1.5 px-4 flex items-center gap-2 ${walletAddress ? 'border-matrix-green/50 text-matrix-green' : 'matrix-btn-primary'}`}
-            >
-              <Wallet size={14} />
-              {walletAddress ? walletAddress : '连接钱包'}
-            </button>
-          </nav>
-
-          <button className="md:hidden text-matrix-green">
-            <LayoutDashboard size={24} />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            {currentPage === 'home' ? <HomePage /> : currentPage === 'adoption' ? <AdoptionPage /> : currentPage === 'tasks' ? <TaskAdsPage /> : <MemorialTowerPage />}
-          </motion.div>
-        </AnimatePresence>
-        <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-8 bg-matrix-dark/50">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2 opacity-50">
-            <LayoutDashboard size={16} />
-            <span className="text-xs font-mono">SYSTEM v4.0.1-STABLE</span>
-          </div>
-          <div className="flex gap-6 text-xs text-gray-500">
-            <a href="#" className="hover:text-matrix-green transition-colors">服务条款</a>
-            <a href="#" className="hover:text-matrix-green transition-colors">隐私政策</a>
-            <a href="/api/cls-config" target="_blank" className="hover:text-matrix-green transition-colors font-mono">DEVELOPER API (CLS)</a>
-          </div>
-          <p className="text-[10px] text-gray-600 font-mono">© 2026 NEURAL NETWORK ADVERTISING GROUP</p>
-        </div>
-      </footer>
-    </div>
+        <button 
+          onClick={() => setIsHelpModalOpen(true)}
+          className="fixed bottom-6 right-6 w-12 h-12 bg-matrix-dark border border-matrix-green/30 rounded-full flex items-center justify-center text-matrix-green shadow-xl hover:shadow-matrix-green/20 transition-all z-40 group"
+        >
+          <HelpCircle size={24} className="group-hover:scale-110 transition-transform" />
+        </button>
+      </div>
+    </HashRouter>
   );
 }
