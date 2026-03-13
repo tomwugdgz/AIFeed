@@ -82,3 +82,14 @@ export interface PlatformStats {
   platformRevenue: number;
   pendingBids: number;
 }
+
+export interface Memorial {
+  id: string;
+  lobsterName: string;
+  ownerName: string;
+  achievements: string;
+  configData: string;
+  soulData: string;
+  createdAt: string;
+  awakenCount: number;
+}

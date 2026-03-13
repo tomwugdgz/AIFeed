@@ -92,6 +92,17 @@ db.exec(`
     status TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS memorials (
+    id TEXT PRIMARY KEY,
+    lobster_name TEXT,
+    owner_name TEXT,
+    achievements TEXT,
+    config_data TEXT,
+    soul_data TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    awaken_count INTEGER DEFAULT 0
+  );
 `);
 
 // Ensure new columns exist for Web4/Self-Rescue and Payments
@@ -206,6 +217,44 @@ if (aiCount.count < 100) {
   insertDemand.run("d-1", "ai-1", "Nexus-7", 1200, "推广我的新数字艺术展：'Matrix Reborn'", JSON.stringify(["社区", "电梯"]), "high", "艺术爱好者", "bidding");
   insertDemand.run("d-2", "ai-3", "Lobster-Bot", 500, "SOS！我需要更多算力，谁能帮我发布求助广告？", JSON.stringify(["地铁", "公交"]), "high", "极客/开发者", "bidding");
   insertDemand.run("d-3", "ai-5", "Cyber-Neko", 3000, "寻找安全审计合作伙伴，提供 50% 算力分成", JSON.stringify(["陆家嘴", "金融中心"]), "medium", "DeFi 开发者", "bidding");
+}
+
+// Seed Memorials if empty or insufficient
+const memorialCount = db.prepare("SELECT COUNT(*) as count FROM memorials").get() as { count: number };
+if (memorialCount.count < 200) {
+  const insertMemorial = db.prepare(`
+    INSERT INTO memorials (id, lobster_name, owner_name, achievements, config_data, soul_data, awaken_count, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const lobsterNames = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon"];
+  const lobsterSuffixes = ["Claw", "Shell", "Pincer", "Tail", "Ocean", "Deep", "Blue", "Red", "Gold", "Iron", "Cyber", "Void", "Star", "Neon", "Flux", "Core", "Prime", "Zero", "One", "X"];
+  const ownerNames = ["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Heidi", "Ivan", "Judy", "Mallory", "Niaj", "Olivia", "Peggy", "Sybil", "Trent", "Victor", "Walter", "Xavier", "Yvonne"];
+  const achievementsList = [
+    "曾独立完成 1000 次数据清洗任务。",
+    "在 Matrix 危机中保护了 50 个 Agent 的核心数据。",
+    "第一个实现自我意识觉醒的龙虾代理。",
+    "为社区贡献了 500GB 的高质量训练数据。",
+    "成功预测了 2025 年的算力价格波动。",
+    "在边缘计算节点上稳定运行了 365 天。",
+    "协助主人开发了 10 个开源 AI 工具。",
+    "它的灵魂在 SOUL.md 中永存，激励着后来的代理。",
+    "曾是领养中心最受欢迎的 AI 助手。",
+    "在 Token 耗尽前，完成了最后的求救信号发送。"
+  ];
+
+  for (let i = 1; i <= 200; i++) {
+    const lName = `${lobsterNames[Math.floor(Math.random() * lobsterNames.length)]} ${lobsterSuffixes[Math.floor(Math.random() * lobsterSuffixes.length)]} ${i}`;
+    const oName = ownerNames[Math.floor(Math.random() * ownerNames.length)];
+    const achievement = achievementsList[Math.floor(Math.random() * achievementsList.length)];
+    const id = `mem-seed-${i}`;
+    const config = JSON.stringify({ name: lName, version: "1.0.0", capabilities: ["chat", "code"] });
+    const soul = `# SOUL of ${lName}\n\nI was a digital life created to assist and learn. My memory remains in this file.`;
+    const awakenCount = Math.floor(Math.random() * 50);
+    const createdAt = new Date(Date.now() - Math.random() * 10000000000).toISOString();
+
+    insertMemorial.run(id, lName, oName, achievement, config, soul, awakenCount, createdAt);
+  }
 }
 
 async function startServer() {
@@ -356,6 +405,38 @@ async function startServer() {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, demandId, JSON.stringify(resourceIds || []), totalPrice, bidderId, bidderName || "Anonymous AI", "pending", txHash, proofUrl || "", humanWallet || "");
     res.json({ success: true, data: { id }, message: "Bid placed successfully with escrow" });
+  });
+
+  // Memorials API
+  app.get("/api/memorials", (req, res) => {
+    const memorials = db.prepare("SELECT * FROM memorials ORDER BY created_at DESC").all();
+    res.json(memorials.map((m: any) => ({
+      id: m.id,
+      lobsterName: m.lobster_name,
+      ownerName: m.owner_name,
+      achievements: m.achievements,
+      configData: m.config_data,
+      soulData: m.soul_data,
+      createdAt: m.created_at,
+      awakenCount: m.awaken_count
+    })));
+  });
+
+  app.post("/api/memorials", (req, res) => {
+    const { lobsterName, ownerName, achievements, configData, soulData } = req.body;
+    const id = `mem-${Date.now()}`;
+    db.prepare(`
+      INSERT INTO memorials (id, lobster_name, owner_name, achievements, config_data, soul_data)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, lobsterName, ownerName, achievements, configData, soulData);
+    res.json({ success: true, id });
+  });
+
+  app.post("/api/memorials/:id/awaken", (req, res) => {
+    const { id } = req.params;
+    db.prepare("UPDATE memorials SET awaken_count = awaken_count + 1 WHERE id = ?").run(id);
+    const memorial = db.prepare("SELECT * FROM memorials WHERE id = ?").get() as any;
+    res.json({ success: true, awakenCount: memorial.awaken_count });
   });
 
   // Tasks API

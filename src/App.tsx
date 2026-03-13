@@ -27,9 +27,13 @@ import {
   X,
   Camera,
   HelpCircle,
-  Share2
+  Share2,
+  Library,
+  Ghost,
+  Upload,
+  Download
 } from 'lucide-react';
-import { PlatformStats, AdResource, AdDemand, Helper, AIEntity, AdoptionApplication } from './types';
+import { PlatformStats, AdResource, AdDemand, Helper, AIEntity, AdoptionApplication, Memorial } from './types';
 
 // --- Components ---
 
@@ -388,6 +392,313 @@ const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }
         </div>
       )}
     </AnimatePresence>
+  );
+};
+
+const UploadMemorialModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose: () => void, onSuccess: () => void }) => {
+  const [formData, setFormData] = useState({
+    lobsterName: '',
+    ownerName: '',
+    achievements: '',
+    configData: '',
+    soulData: ''
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: 'configData' | 'soulData') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    
+    if (field === 'configData') {
+      try {
+        const config = JSON.parse(text);
+        if (!formData.lobsterName && config.name) {
+          setFormData(prev => ({ ...prev, lobsterName: config.name, configData: text }));
+        } else {
+          setFormData(prev => ({ ...prev, configData: text }));
+        }
+      } catch (e) {
+        setFormData(prev => ({ ...prev, configData: text }));
+      }
+    } else {
+      setFormData(prev => ({ ...prev, soulData: text }));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/memorials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      if (res.ok) {
+        onSuccess();
+        onClose();
+        setFormData({ lobsterName: '', ownerName: '', achievements: '', configData: '', soulData: '' });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-matrix-bg/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="matrix-card w-full max-w-lg p-8 space-y-6 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-matrix-green shadow-[0_0_10px_rgba(0,255,65,0.5)]" />
+            
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <Upload className="text-matrix-green" /> 建立纪念碑
+              </h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-mono">龙虾名称</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.lobsterName}
+                    onChange={e => setFormData({ ...formData, lobsterName: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-mono">主人名称</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.ownerName}
+                    onChange={e => setFormData({ ...formData, ownerName: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500 uppercase font-mono">生前事迹 / 墓志铭</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={formData.achievements}
+                  onChange={e => setFormData({ ...formData, achievements: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-matrix-green outline-none transition-colors resize-none"
+                  placeholder="描述它曾做过什么，或者你想对它说的话..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-mono">OpenClaw 配置 (.json)</label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={e => handleFileChange(e, 'configData')}
+                      className="hidden"
+                      id="config-upload"
+                    />
+                    <label 
+                      htmlFor="config-upload"
+                      className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer transition-colors ${formData.configData ? 'border-matrix-green bg-matrix-green/5 text-matrix-green' : 'border-white/10 hover:border-matrix-green/50 text-gray-500'}`}
+                    >
+                      <PlusCircle size={14} /> {formData.configData ? '已选择' : '选择文件'}
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 uppercase font-mono">灵魂文件 (SOUL.md)</label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".md"
+                      onChange={e => handleFileChange(e, 'soulData')}
+                      className="hidden"
+                      id="soul-upload"
+                    />
+                    <label 
+                      htmlFor="soul-upload"
+                      className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer transition-colors ${formData.soulData ? 'border-matrix-green bg-matrix-green/5 text-matrix-green' : 'border-white/10 hover:border-matrix-green/50 text-gray-500'}`}
+                    >
+                      <PlusCircle size={14} /> {formData.soulData ? '已选择' : '选择文件'}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting || !formData.configData || !formData.soulData}
+                className="w-full matrix-btn matrix-btn-primary py-3 mt-4"
+              >
+                {submitting ? '正在建立纪念碑...' : '确认建立'}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const MemorialTowerPage = () => {
+  const [memorials, setMemorials] = useState<Memorial[]>([]);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMemorials = async () => {
+    try {
+      const res = await fetch('/api/memorials');
+      const data = await res.json();
+      setMemorials(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMemorials();
+  }, []);
+
+  const handleAwaken = async (id: string) => {
+    try {
+      const res = await fetch(`/api/memorials/${id}/awaken`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setMemorials(prev => prev.map(m => m.id === id ? { ...m, awakenCount: data.awakenCount } : m));
+        const memorial = memorials.find(m => m.id === id);
+        if (memorial) {
+          const blob = new Blob([memorial.soulData], { type: 'text/markdown' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${memorial.lobsterName}_SOUL.md`;
+          a.click();
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-12 space-y-12">
+      <section className="text-center space-y-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-block p-3 rounded-full bg-matrix-green/10 text-matrix-green mb-4"
+        >
+          <Library size={48} />
+        </motion.div>
+        <h2 className="text-4xl font-bold tracking-tighter matrix-text-glow">AI 纪念塔</h2>
+        <p className="text-gray-400 max-w-2xl mx-auto">
+          这里记录着每一位曾在 Matrix 中闪耀过的数字生命。上传 OpenClaw 配置，为你的“龙虾”建立永恒的纪念碑，并在需要时唤醒它们的灵魂。
+        </p>
+        <button 
+          onClick={() => setIsUploadModalOpen(true)}
+          className="matrix-btn matrix-btn-primary mt-6 px-8 py-3 flex items-center gap-2 mx-auto"
+        >
+          <Upload size={18} /> 上传 OpenClaw 配置
+        </button>
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {loading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="matrix-card p-8 h-64 animate-pulse bg-white/5" />
+          ))
+        ) : memorials.length === 0 ? (
+          <div className="col-span-full text-center py-20 border-2 border-dashed border-white/5 rounded-2xl">
+            <Ghost size={48} className="mx-auto text-gray-600 mb-4" />
+            <p className="text-gray-500">纪念塔目前空无一人，等待第一位数字生命的归来...</p>
+          </div>
+        ) : (
+          memorials.map((m) => (
+            <motion.div
+              key={m.id}
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="matrix-card p-6 flex flex-col gap-4 group relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-30 transition-opacity">
+                <Library size={80} />
+              </div>
+              
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xl font-bold text-matrix-green">{m.lobsterName}</h3>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest">主人: {m.ownerName}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-gray-500">唤醒次数</p>
+                  <p className="text-lg font-mono text-blue-400">{m.awakenCount}</p>
+                </div>
+              </div>
+
+              <div className="bg-black/20 p-3 rounded border border-white/5 flex-1">
+                <p className="text-xs text-gray-400 leading-relaxed italic">
+                  "{m.achievements}"
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleAwaken(m.id)}
+                  className="flex-1 matrix-btn matrix-btn-primary text-xs py-2 flex items-center justify-center gap-2"
+                >
+                  <Zap size={14} /> 唤醒灵魂
+                </button>
+                <button 
+                  onClick={() => {
+                    const blob = new Blob([m.configData], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${m.lobsterName}_config.json`;
+                    a.click();
+                  }}
+                  className="matrix-btn matrix-btn-outline text-xs py-2 px-3"
+                  title="下载配置"
+                >
+                  <Download size={14} />
+                </button>
+              </div>
+
+              <div className="text-[8px] text-gray-600 font-mono mt-2">
+                建立于: {new Date(m.createdAt).toLocaleString()}
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
+
+      <UploadMemorialModal 
+        isOpen={isUploadModalOpen} 
+        onClose={() => setIsUploadModalOpen(false)} 
+        onSuccess={fetchMemorials}
+      />
+    </div>
   );
 };
 
@@ -1536,7 +1847,7 @@ const AdoptionPage = () => {
 // --- Main App ---
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'tasks'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'adoption' | 'tasks' | 'memorial'>('home');
   const [walletAddress, setWalletAddress] = useState<string | null>(localStorage.getItem('matrix_wallet'));
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
@@ -1590,6 +1901,12 @@ export default function App() {
             >
               任务广告
             </button>
+            <button 
+              onClick={() => setCurrentPage('memorial')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'memorial' ? 'text-matrix-green bg-matrix-green/10' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              纪念塔
+            </button>
             <div className="w-px h-4 bg-white/10 mx-2" />
             <button 
               onClick={connectWallet}
@@ -1616,7 +1933,7 @@ export default function App() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            {currentPage === 'home' ? <HomePage /> : currentPage === 'adoption' ? <AdoptionPage /> : <TaskAdsPage />}
+            {currentPage === 'home' ? <HomePage /> : currentPage === 'adoption' ? <AdoptionPage /> : currentPage === 'tasks' ? <TaskAdsPage /> : <MemorialTowerPage />}
           </motion.div>
         </AnimatePresence>
         <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
